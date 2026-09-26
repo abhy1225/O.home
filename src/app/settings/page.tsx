@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 환경설정 (기획서 5장) — 0차: 「디자인」 탭(테마) 실동작.
 // 나머지 카테고리는 해당 기능 마일스톤에서 함께 구현.
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -3125,7 +3125,7 @@ function FontRow({ f }: { f: FontDef }) {
 
 /** 폰트 탭 (5.1) — 내장 폰트도 수정·삭제 가능 · 웹폰트 URL 등록. 파일 업로드·페어링은 후속 */
 function FontPane() {
-  const { fonts, hiddenCount, addFont, addFontFile, restoreBuiltins, characterNameSpacing, setCharacterNameSpacing } = useFonts();
+  const { fonts, hiddenCount, addFont, addFontFile, restoreBuiltins, characterNameSpacing, setCharacterNameSpacing, bodyLineHeight, setBodyLineHeight } = useFonts();
   const toast = useToast();
   const [name, setName] = useState('');
   const [family, setFamily] = useState('');
@@ -3159,6 +3159,16 @@ function FontPane() {
       <div className="set-row" style={{ marginTop: 14 }}>
         <div className="l"><b>자캐 이름 자간</b><small>자캐 상세 페이지의 큰 캐릭터 이름 사이 간격 — 0은 기본 간격</small></div>
         <KStep value={characterNameSpacing} min={0} max={0.3} step={0.01} suffix="em" onChange={setCharacterNameSpacing} />
+      </div>
+
+      <div className="set-row">
+        <div className="l"><b>본문 줄간격</b><small>리치 에디터·자캐 소개·게시글 본문의 줄간격 — 한글의 150% / 160% / 180% 기준</small></div>
+        <div className="mini-seg">
+          {([['150%', 1.5], ['160%', 1.6], ['180%', 1.8]] as const).map(([label, value]) => (
+            <button key={label} className={Math.abs(bodyLineHeight - value) < 0.001 ? 'on' : ''}
+              onClick={() => setBodyLineHeight(value)}>{label}</button>
+          ))}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>

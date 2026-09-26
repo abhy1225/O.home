@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 폰트 라이브러리 (5.1) — 내장(구글폰트) + 웹폰트 URL 등록
 // 내장 폰트도 삭제·수정 가능 — 원하는 폰트만 남길 수 있음. 삭제된 폰트를 쓰던 기존 데이터는
 // familyOf가 전체 풀에서 계속 해석하므로 표시가 깨지지 않음.
@@ -86,9 +86,10 @@ interface FontState {
   overrides: Record<string, Partial<FontDef>>;   // 내장 폰트 수정값 (name/family/cssUrl)
   roles: Record<FontRole, RoleSetting>;          // 역할 → 폰트/굵기/크기
   characterNameSpacing: number;                  // 자캐 상세 이름 자간(em)
+  bodyLineHeight: number;                        // 본문 줄간격 배율(1.5/1.6/1.8 등)
 }
 
-const EMPTY: FontState = { custom: [], hidden: [], overrides: {}, roles: DEFAULT_ROLES, characterNameSpacing: 0.2 };
+const EMPTY: FontState = { custom: [], hidden: [], overrides: {}, roles: DEFAULT_ROLES, characterNameSpacing: 0.2, bodyLineHeight: 1.85 };
 
 /** 저장값 정규화 — 구버전(역할=문자열 id)도 수용 */
 function normRoles(raw?: Record<string, unknown>): Record<FontRole, RoleSetting> {
@@ -108,6 +109,8 @@ interface FontCtx {
   roles: Record<FontRole, RoleSetting>;          // 드래프트가 있으면 드래프트 (미리보기)
   characterNameSpacing: number;                  // 자캐 상세 이름 자간(em)
   setCharacterNameSpacing: (value: number) => void;
+  bodyLineHeight: number;                        // 본문 줄간격 배율
+  setBodyLineHeight: (value: number) => void;
   setRole: (role: FontRole, patch: Partial<RoleSetting>) => void;  // 드래프트에만 — SAVE로 확정 (v1.9)
   rolesDirty: boolean;                           // 역할 폰트에 저장 안 된 변경 존재
   saveRoles: () => void;                         // 역할 폰트 드래프트 → 실제 저장
@@ -220,6 +223,7 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     root.setProperty('--font-pagetitle', resolve(roles.pagetitle.id, 'pagetitle'));
     root.setProperty('--font-subtitle', resolve(roles.subtitle.id, 'subtitle'));
     root.setProperty('--font-logosub', resolve(roles.logosub.id, 'logosub'));
+    root.setProperty('--body-line-height', String(Number.isFinite(st.bodyLineHeight) ? st.bodyLineHeight : 1.85));
     (Object.keys(roles) as FontRole[]).forEach(r => {
       const cfg = roles[r];
       root.setProperty(`--fs-${r}`, String((cfg.scale ?? 100) / 100));
@@ -335,6 +339,13 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     apply(s => ({ ...s, characterNameSpacing: v }));
   }, []);
 
+  // 본문 줄간격 — 1.5=150%, 1.6=160%, 1.8=180% 등. 기존 사이트 값은 1.85.
+  const bodyLineHeight = Number.isFinite(st.bodyLineHeight) ? st.bodyLineHeight : 1.85;
+  const setBodyLineHeight = useCallback((value: number) => {
+    const v = Math.min(2.5, Math.max(1, value));
+    apply(s => ({ ...s, bodyLineHeight: v }));
+  }, []);
+
   // 페어(pairId) 반영 스택 — 영문 폰트를 골라도 한글은 페어 폰트로 렌더 (v1.9)
   const familyOf = useCallback((id?: string) => {
     const f = pool.find(x => x.id === id);
@@ -348,7 +359,7 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{
       fonts, hiddenCount: st.hidden.length, roles, setRole, rolesDirty, saveRoles, discardRoles,
-      characterNameSpacing, setCharacterNameSpacing,
+      characterNameSpacing, setCharacterNameSpacing, bodyLineHeight, setBodyLineHeight,
       addFont, addFontFile, setFontPair, updateFont, removeFont, resetFont, restoreBuiltins, familyOf,
     }}>
       {children}
