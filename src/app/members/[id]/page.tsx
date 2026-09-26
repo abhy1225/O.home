@@ -44,7 +44,16 @@ export default function MemberDetailPage() {
     if (isServerMode()) {
       if (members.length === 0) return;                       // 아직 받아오는 중
       const hit = members.find(m => m.id === id);
-      setMember(hit ? { id: hit.id, nickname: hit.nickname, role: hit.role ?? 'member' } : null);
+      setMember(
+  hit
+    ? {
+        id: hit.id,
+        username: hit.username,
+        nickname: hit.nickname,
+        role: hit.role ?? 'member',
+      }
+    : null
+);
     } else {
       setMember(mockMemberInfo(id));
     }
