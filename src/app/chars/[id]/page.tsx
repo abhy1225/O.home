@@ -25,7 +25,7 @@ function CharDetailInner() {
   const { user, isAdmin } = useAuth();
   const [chars, setChars, loaded] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
-  const { familyOf } = useFonts();
+  const { familyOf, characterNameSpacing } = useFonts();
   // 큰 글씨 — 추가 섹션(창고캐 등)이면 그 이름, 눌렀을 때도 그 목록으로 (v2.0 사용자 제보)
   const tt = useSectionTitle('chars', findByKey(chars, id)?.secId, 'CHARACTERS');
   const params = useSearchParams();
@@ -253,7 +253,7 @@ function CharDetailInner() {
             fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: eff.nameSize ?? 38,
             // 굵기는 끌 수 있다 (v2.0 사용자 요청 — 폰트에 따라 볼드가 안 어울린다). 기본은 지금처럼 굵게
             fontWeight: (eff.nameBold ?? true) ? 600 : 400,
-            letterSpacing: '.2em', lineHeight: 1.1,
+            letterSpacing: `${characterNameSpacing}em`, lineHeight: 1.1,
           }}>{eff.name}</div>
           <div className="sub" style={{ marginBottom: 14 }}>{eff.sub}</div>
 

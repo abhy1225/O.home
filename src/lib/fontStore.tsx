@@ -85,9 +85,10 @@ interface FontState {
   hidden: string[];                              // 삭제(숨김)된 내장 폰트 id
   overrides: Record<string, Partial<FontDef>>;   // 내장 폰트 수정값 (name/family/cssUrl)
   roles: Record<FontRole, RoleSetting>;          // 역할 → 폰트/굵기/크기
+  characterNameSpacing: number;                  // 자캐 상세 이름 자간(em)
 }
 
-const EMPTY: FontState = { custom: [], hidden: [], overrides: {}, roles: DEFAULT_ROLES };
+const EMPTY: FontState = { custom: [], hidden: [], overrides: {}, roles: DEFAULT_ROLES, characterNameSpacing: 0.2 };
 
 /** 저장값 정규화 — 구버전(역할=문자열 id)도 수용 */
 function normRoles(raw?: Record<string, unknown>): Record<FontRole, RoleSetting> {
@@ -105,6 +106,8 @@ interface FontCtx {
   fonts: FontDef[];                              // 선택 목록 (숨김 제외 · 수정 반영)
   hiddenCount: number;
   roles: Record<FontRole, RoleSetting>;          // 드래프트가 있으면 드래프트 (미리보기)
+  characterNameSpacing: number;                  // 자캐 상세 이름 자간(em)
+  setCharacterNameSpacing: (value: number) => void;
   setRole: (role: FontRole, patch: Partial<RoleSetting>) => void;  // 드래프트에만 — SAVE로 확정 (v1.9)
   rolesDirty: boolean;                           // 역할 폰트에 저장 안 된 변경 존재
   saveRoles: () => void;                         // 역할 폰트 드래프트 → 실제 저장
@@ -325,6 +328,13 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const discardRoles = useCallback(() => setDraftRoles(null), []);
 
+  // 자캐 상세 이름 자간 — 폰트 탭에서 전역으로 조절, 즉시 저장
+  const characterNameSpacing = Number.isFinite(st.characterNameSpacing) ? st.characterNameSpacing : 0.2;
+  const setCharacterNameSpacing = useCallback((value: number) => {
+    const v = Math.min(0.3, Math.max(0, value));
+    apply(s => ({ ...s, characterNameSpacing: v }));
+  }, []);
+
   // 페어(pairId) 반영 스택 — 영문 폰트를 골라도 한글은 페어 폰트로 렌더 (v1.9)
   const familyOf = useCallback((id?: string) => {
     const f = pool.find(x => x.id === id);
@@ -338,6 +348,7 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{
       fonts, hiddenCount: st.hidden.length, roles, setRole, rolesDirty, saveRoles, discardRoles,
+      characterNameSpacing, setCharacterNameSpacing,
       addFont, addFontFile, setFontPair, updateFont, removeFont, resetFont, restoreBuiltins, familyOf,
     }}>
       {children}

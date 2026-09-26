@@ -3125,7 +3125,7 @@ function FontRow({ f }: { f: FontDef }) {
 
 /** 폰트 탭 (5.1) — 내장 폰트도 수정·삭제 가능 · 웹폰트 URL 등록. 파일 업로드·페어링은 후속 */
 function FontPane() {
-  const { fonts, hiddenCount, addFont, addFontFile, restoreBuiltins } = useFonts();
+  const { fonts, hiddenCount, addFont, addFontFile, restoreBuiltins, characterNameSpacing, setCharacterNameSpacing } = useFonts();
   const toast = useToast();
   const [name, setName] = useState('');
   const [family, setFamily] = useState('');
@@ -3155,6 +3155,11 @@ function FontPane() {
         </div>
       )}
       <p className="hint">삭제해도 이미 그 폰트를 쓰고 있는 캐릭터·자관 표시는 깨지지 않습니다 — 선택 목록에서만 빠집니다</p>
+
+      <div className="set-row" style={{ marginTop: 14 }}>
+        <div className="l"><b>자캐 이름 자간</b><small>자캐 상세 페이지의 큰 캐릭터 이름 사이 간격 — 0은 기본 간격</small></div>
+        <KStep value={characterNameSpacing} min={0} max={0.3} step={0.01} suffix="em" onChange={setCharacterNameSpacing} />
+      </div>
 
       <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
         <label className="k-label" style={{ margin: 0 }}>웹폰트 추가 — 눈누/구글폰트의 CSS 링크(URL)와 font-family 값</label>
