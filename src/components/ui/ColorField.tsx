@@ -139,16 +139,37 @@ export function ColorField({ value, onChange }: { value: string; onChange: (hex:
   return (
     <div className="color-field" ref={rootRef}>
       <input
-        className="k-input"
-        value={text}
-        spellCheck={false}
-        onChange={e => {
-          const v = e.target.value;
-          setText(v);
-          // hex 말고 rgba(...)도 그대로 받는다 (v2.0 사용자 요청)
-          if (isValidColor(v)) onChange(normalizeColor(v));
-        }}
-      />
+  className="k-input"
+  value={text}
+  spellCheck={false}
+  onChange={e => {
+    const v = e.target.value;
+    setText(v);
+
+    const s = v.trim();
+
+    // 입력 중인 HEX는 6자리 또는 8자리까지 기다린다.
+    // 3자리 HEX(#fff)는 입력 도중 자동 변환하지 않는다.
+    const fullHex = /^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(s);
+
+    // rgb()/rgba()는 완성된 형태라면 바로 반영
+    const rgb = /^rgba?\(([^)]+)\)$/i.test(s);
+
+    if (fullHex || (rgb && isValidColor(s))) {
+      onChange(normalizeColor(s));
+    }
+  }}
+  onBlur={() => {
+    const s = text.trim();
+
+    // 입력을 끝냈을 때는 3·4자리 HEX도 정상적으로 처리
+    if (isValidColor(s)) {
+      const normalized = normalizeColor(s);
+      setText(normalized);
+      onChange(normalized);
+    }
+  }}
+/>
       <button
         type="button"
         className="color-dot"
