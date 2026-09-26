@@ -5,8 +5,42 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
+import { Extension } from '@tiptap/core';
 import { putBlob } from '@/lib/blobStore';
 import { useToast } from '@/components/ui/Toast';
+
+
+
+// 문단별 정렬·줄간격을 HTML style로 저장한다. 별도 패키지 없이 TipTap의 paragraph/heading에
+// 속성만 확장하므로 기존 글과도 호환된다. 값이 없으면 환경설정의 전역 줄간격을 따른다.
+const ParagraphFormat = Extension.create({
+  name: 'paragraphFormat',
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph', 'heading'],
+      attributes: {
+        textAlign: {
+          default: null,
+          parseHTML: el => el.style.textAlign || null,
+          renderHTML: attrs => attrs.textAlign ? { style: `text-align:${attrs.textAlign}` } : {},
+        },
+        lineHeight: {
+          default: null,
+          parseHTML: el => el.style.lineHeight || null,
+          renderHTML: attrs => attrs.lineHeight ? { style: `line-height:${attrs.lineHeight}` } : {},
+        },
+      },
+    }];
+  },
+});
+
+const LINE_HEIGHT_OPTIONS = [
+  { label: '기본간격', value: '' },
+  { label: '140%', value: '1.4' },
+  { label: '150%', value: '1.5' },
+  { label: '160%', value: '1.6' },
+  { label: '180%', value: '1.8' },
+];
 
 /** 로컬 모드용 — 파일을 그대로 본문에 심는다 (서버가 없어 올릴 곳이 없을 때) */
 function toDataUrl(f: File): Promise<string> {
@@ -36,7 +70,7 @@ export function RichEditor({ value, onChange, placeholder }: {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const editor = useEditor({
-    extensions: [StarterKit, Image],
+    extensions: [StarterKit, Image, ParagraphFormat],
     content: value || '<p></p>',
     immediatelyRender: false,
     editorProps: {
@@ -44,6 +78,18 @@ export function RichEditor({ value, onChange, placeholder }: {
     },
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
   });
+
+  const setParagraphAttr = (attr: 'textAlign' | 'lineHeight', value: string | null) => {
+    if (!editor) return;
+    const chain = editor.chain().focus();
+    chain.updateAttributes('paragraph', { [attr]: value });
+    chain.updateAttributes('heading', { [attr]: value });
+    chain.run();
+  };
+  const currentAlign = editor?.getAttributes('paragraph').textAlign
+    || editor?.getAttributes('heading').textAlign || 'left';
+  const currentLineHeight = editor?.getAttributes('paragraph').lineHeight
+    || editor?.getAttributes('heading').lineHeight || '';
 
   // 외부 값이 완전히 바뀐 경우(탭 전환) 동기화
   useEffect(() => {
@@ -95,6 +141,16 @@ export function RichEditor({ value, onChange, placeholder }: {
         <TBtn title="인용" label="❝" on={editor.isActive('blockquote')}
           onClick={() => editor.chain().focus().toggleBlockquote().run()} />
         <TBtn title="구분선" label="—" onClick={() => editor.chain().focus().setHorizontalRule().run()} />
+        <span className="re-sep" />
+        <TBtn title="왼쪽 정렬" label="≡←" on={currentAlign === 'left'} onClick={() => setParagraphAttr('textAlign', 'left')} />
+        <TBtn title="가운데 정렬" label="≡↔" on={currentAlign === 'center'} onClick={() => setParagraphAttr('textAlign', 'center')} />
+        <TBtn title="오른쪽 정렬" label="→≡" on={currentAlign === 'right'} onClick={() => setParagraphAttr('textAlign', 'right')} />
+        <TBtn title="양쪽 정렬" label="☰" on={currentAlign === 'justify'} onClick={() => setParagraphAttr('textAlign', 'justify')} />
+        <select className="re-select" title="줄간격" aria-label="줄간격" value={currentLineHeight}
+          onMouseDown={e => e.stopPropagation()}
+          onChange={e => setParagraphAttr('lineHeight', e.target.value || null)}>
+          {LINE_HEIGHT_OPTIONS.map(o => <option key={o.value || 'default'} value={o.value}>{o.label}</option>)}
+        </select>
         <span className="re-sep" />
         <TBtn title={busy ? '올리는 중…' : '이미지 올리기'} label={busy ? '⏳' : '🖼'}
           onClick={() => { if (!busy) fileRef.current?.click(); }} />

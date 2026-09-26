@@ -3125,7 +3125,7 @@ function FontRow({ f }: { f: FontDef }) {
 
 /** 폰트 탭 (5.1) — 내장 폰트도 수정·삭제 가능 · 웹폰트 URL 등록. 파일 업로드·페어링은 후속 */
 function FontPane() {
-  const { fonts, hiddenCount, addFont, addFontFile, restoreBuiltins, characterNameSpacing, setCharacterNameSpacing } = useFonts();
+  const { fonts, hiddenCount, addFont, addFontFile, restoreBuiltins, characterNameSpacing, setCharacterNameSpacing, bodyLineHeight, setBodyLineHeight } = useFonts();
   const toast = useToast();
   const [name, setName] = useState('');
   const [family, setFamily] = useState('');
@@ -3168,6 +3168,18 @@ function FontPane() {
       <div className="set-row" style={{ marginTop: 14 }}>
         <div className="l"><b>자캐 이름 자간</b><small>자캐 상세 페이지의 큰 캐릭터 이름 사이 간격 — 0은 기본 간격</small></div>
         <KStep value={characterNameSpacing} min={0} max={0.3} step={0.01} suffix="em" onChange={setCharacterNameSpacing} />
+      </div>
+
+      <div className="set-row" style={{ marginTop: 14 }}>
+        <div className="l"><b>본문 줄간격</b><small>게시글·자캐 소개·에디터의 기본 줄간격 — 에디터에서 문단별로 따로 지정할 수도 있습니다</small></div>
+        <KSelect minWidth={120} value={String(bodyLineHeight)} onChange={v => setBodyLineHeight(Number(v))}
+          options={[
+            { value: '1.85', label: '기본간격' },
+            { value: '1.4', label: '140%' },
+            { value: '1.5', label: '150%' },
+            { value: '1.6', label: '160%' },
+            { value: '1.8', label: '180%' },
+          ]} />
       </div>
 
       <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
