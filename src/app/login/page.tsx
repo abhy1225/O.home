@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [sId, setSId] = useState('');
   const [sPw, setSPw] = useState('');
   const [sNick, setSNick] = useState('');
-  const [sEmail, setSEmail] = useState('');   // 가입 이메일 (v1.9 — 아이디 찾기/비번 리셋용)
+  const [sEmail, setSEmail] = useState('');   // 가입 이메일 (비밀번호 재설정용)
   const [sCode, setSCode] = useState('');
   const [sErr, setSErr] = useState('');
   // 아이디/비밀번호 찾기
@@ -43,8 +43,8 @@ export default function LoginPage() {
 
   const doSignup = async () => {
     setSErr('');
-    // 서버 모드에서는 아이디가 곧 이메일 — 따로 받지 않고 그대로 쓴다
-    const r = await signup(sId.trim(), sPw, sNick.trim(), sCode.trim(), (mock ? sEmail : sId).trim());
+    // 아이디와 이메일을 분리한다
+    const r = await signup(sId.trim(), sEmail.trim(), sPw, sNick.trim(), sCode.trim());
     if (!r.ok) { setSErr(r.error ?? '가입 실패'); return; }
     setSignupOpen(false);
     toast(mock ? '가입되었습니다 — 만든 계정으로 로그인해 보세요' : '가입되었습니다 — 이메일 인증 후 로그인해 주세요');
@@ -102,13 +102,10 @@ export default function LoginPage() {
           <button className="btn btn-dark" onClick={doSignup}>가입</button>
         </>}>
         <div style={{ display: 'grid', gap: 9 }}>
-          <KInput placeholder={mock ? '아이디' : '이메일 (아이디)'} value={sId} onChange={e => setSId(e.target.value)} />
+          <KInput placeholder="아이디 (영문/숫자/밑줄 3~20자)" value={sId} onChange={e => setSId(e.target.value.toLowerCase())} />
           <KInput placeholder="비밀번호" type="password" value={sPw} onChange={e => setSPw(e.target.value)} />
           <KInput placeholder="닉네임" value={sNick} onChange={e => setSNick(e.target.value)} />
-          {/* 서버 모드는 이메일이 곧 아이디라 다시 받지 않는다 (로컬 계정에서만 별도 입력) */}
-          {mock && (
-            <KInput placeholder="이메일 — 아이디·비밀번호 찾기에 사용" value={sEmail} onChange={e => setSEmail(e.target.value)} />
-          )}
+          <KInput placeholder="이메일 — 비밀번호 재설정에 사용" type="email" value={sEmail} onChange={e => setSEmail(e.target.value)} />
           <KInput placeholder="가입코드" value={sCode} onChange={e => setSCode(e.target.value)} />
           {sErr && <p style={{ fontSize: 11.5, color: 'var(--accent)' }}>{sErr}</p>}
         </div>
@@ -116,16 +113,12 @@ export default function LoginPage() {
 
       {/* 아이디·비밀번호 찾기 모달 (4.8, v1.9) — 가입 이메일 기준 */}
       <Modal open={findOpen} onClose={() => { setFindOpen(false); setFInfo(''); setFErr(''); }} small
-        title={mock ? '아이디·비밀번호 찾기' : '비밀번호 재설정'}
-        desc={mock
-          ? '가입 시 등록한 이메일로 아이디를 찾거나 임시 비밀번호를 발급합니다'
-          : '가입한 이메일로 재설정 링크를 보냅니다'}
+        title='비밀번호 재설정'
+        desc='가입한 이메일로 재설정 링크를 보냅니다'
         dirty={!!fEmail}
         actions={<>
           <button className="btn btn-ghost" onClick={() => { setFindOpen(false); setFInfo(''); setFErr(''); }}>CANCEL</button>
-          {/* 서버 모드는 이메일이 곧 아이디라 「아이디 찾기」가 의미 없다 */}
-          {mock && <button className="btn btn-ghost" onClick={doFindId}>아이디 찾기</button>}
-          <button className="btn btn-dark" onClick={doFind}>{mock ? '임시 비밀번호' : 'SEND'}</button>
+          <button className="btn btn-dark" onClick={doFind}>SEND</button>
         </>}>
         <div style={{ display: 'grid', gap: 9 }}>
           <KInput placeholder="이메일" value={fEmail} onChange={e => setFEmail(e.target.value)} />

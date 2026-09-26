@@ -10,6 +10,7 @@ export type Role = 'admin' | 'member' | 'guest';
 
 export interface User {
   id: string;
+  username: string;
   nickname: string;
   role: Role;
   avatarUrl?: string;    // 프로필 이미지 (파일 참조 또는 URL)
@@ -22,12 +23,12 @@ type Result = { ok: boolean; error?: string };
 interface AuthCtx {
   user: User | null;          // null = 비로그인
   isAdmin: boolean;
-  login: (id: string, password: string) => Promise<Result>;
-  signup: (id: string, password: string, nickname: string, inviteCode: string, email?: string) => Promise<Result>;
+  login: (username: string, password: string) => Promise<Result>;
+  signup: (username: string, email: string, password: string, nickname: string, inviteCode: string) => Promise<Result>;
   findId: (email: string) => Promise<Result & { foundId?: string }>;
   resetPassword: (email: string) => Promise<Result & { tempPassword?: string }>;
   logout: () => Promise<void>;
-  updateProfile: (patch: { nickname?: string; avatarUrl?: string | null; avatarColor?: string | null; currentPassword?: string; newPassword?: string }) => Promise<Result>;
+  updateProfile: (patch: { username?: string; nickname?: string; avatarUrl?: string | null; avatarColor?: string | null; currentPassword?: string; newPassword?: string }) => Promise<Result>;
   /** 서버(DB) 연결 없이 브라우저 계정으로 도는 중인지 — 개발·오프라인 */
   mock: boolean;
   /** 누가 보고 있는지 확인이 끝났는지 (v2.0) — 처음 한 박자는 늘 「비로그인」으로 보인다.
@@ -59,8 +60,8 @@ export function markSetupDone() {
 /* ---------- 로컬 계정 (백엔드 없이 개발할 때) ---------- */
 
 const MOCK_ACCOUNTS: Record<string, { password: string; user: User }> = {
-  admin: { password: '0000', user: { id: 'admin', nickname: '관리자', role: 'admin' } },
-  guest: { password: '0000', user: { id: 'guest', nickname: '지인회원', role: 'member' } },
+  admin: { password: '0000', user: { id: 'admin', username: 'admin', nickname: '관리자', role: 'admin' } },
+  guest: { password: '0000', user: { id: 'guest', username: 'guest', nickname: '지인회원', role: 'member' } },
 };
 
 function mockRegistry(): Record<string, { password: string; user: User }> {
@@ -84,9 +85,9 @@ export function completeSetup(v: SetupInput): { ok: boolean; error?: string } {
   if (!id || !v.adminPw) return { ok: false, error: '관리자 아이디와 비밀번호를 입력해 주세요.' };
   try {
     const reg = mockRegistry();
-    reg[id] = { password: v.adminPw, user: { id, nickname: v.adminNick?.trim() || '관리자', role: 'admin' } };
+    reg[id] = { password: v.adminPw, user: { id, username: id, nickname: v.adminNick?.trim() || '관리자', role: 'admin' } };
     if (v.guestPw?.trim()) {
-      reg.guest = { password: v.guestPw.trim(), user: { id: 'guest', nickname: '게스트', role: 'member' } };
+      reg.guest = { password: v.guestPw.trim(), user: { id: 'guest', username: 'guest', nickname: '게스트', role: 'member' } };
     }
     localStorage.setItem(MOCK_REG_KEY, JSON.stringify(reg));
     markSetupDone();
@@ -117,12 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { alive = false; off(); };
   }, [server, be]);
 
-  const login = useCallback(async (id: string, password: string): Promise<Result> => {
+  const login = useCallback(async (username: string, password: string): Promise<Result> => {
     if (server && be) {
-      const r = await be.signIn(id.trim(), password);
+      const r = await be.signIn(username.trim(), password);
       return r.ok ? { ok: true } : { ok: false, error: r.error ?? '로그인에 실패했습니다.' };
     }
-    const acc = mockRegistry()[id] ?? (isSetupDone() ? undefined : MOCK_ACCOUNTS[id]);
+    const acc = mockRegistry()[username] ?? (isSetupDone() ? undefined : MOCK_ACCOUNTS[username]);
     if (!acc || acc.password !== password) return { ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' };
     setUser(acc.user);
     try { localStorage.setItem(MOCK_KEY, JSON.stringify(acc.user)); } catch { /* 무시 */ }
@@ -130,11 +131,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [server, be]);
 
   // 회원가입 — 가입코드(초대코드) 방식
-  const signup = useCallback(async (id: string, password: string, nickname: string, code: string): Promise<Result> => {
-    if (!id || !password || !nickname) return { ok: false, error: '아이디·비밀번호·닉네임을 모두 입력해 주세요.' };
+  const signup = useCallback(async (username: string, email: string, password: string, nickname: string, code: string): Promise<Result> => {
+    if (!username || !email || !password || !nickname) return { ok: false, error: '아이디·비밀번호·닉네임을 모두 입력해 주세요.' };
     if (code !== inviteCode()) return { ok: false, error: '가입코드가 올바르지 않습니다.' };
     if (server && be) {
-      const r = await be.signUp(id.trim(), password, nickname.trim());
+      const r = await be.signUp(username.trim(), email.trim(), password, nickname.trim());
       if (!r.ok) return { ok: false, error: r.error ?? '가입에 실패했습니다.' };
       // 계정이 만들어지는 순간 로그인 상태가 되며 사용자 정보가 먼저 계산되는데,
       // 그때는 닉네임(프로필)이 아직 저장되기 전이라 이메일이 이름 자리에 들어간다.
@@ -142,16 +143,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try { const u = await be.currentUser(); if (u) setUser(u); } catch { /* 무시 */ }
       return { ok: true };
     }
-    if (MOCK_ACCOUNTS[id] || mockRegistry()[id]) return { ok: false, error: '이미 사용 중인 아이디입니다.' };
+    if (MOCK_ACCOUNTS[username] || mockRegistry()[username]) return { ok: false, error: '이미 사용 중인 아이디입니다.' };
     const reg = mockRegistry();
-    reg[id] = { password, user: { id, nickname, role: 'member' } };
+    const localId = crypto.randomUUID();
+    reg[username] = { password, user: { id: localId, username, nickname, role: 'member', email } };
     try { localStorage.setItem(MOCK_REG_KEY, JSON.stringify(reg)); } catch { /* 무시 */ }
     return { ok: true };
   }, [server, be]);
 
   const findId = useCallback(async (email: string): Promise<Result & { foundId?: string }> => {
     if (!email.trim()) return { ok: false, error: '이메일을 입력해 주세요.' };
-    if (server) return { ok: false, error: '이메일이 곧 아이디입니다 — 그대로 로그인해 주세요.' };
+    if (server) return { ok: false, error: '아이디는 마이페이지에서 확인할 수 있습니다.' };
     const hit = Object.values(mockRegistry()).find(a => a.user.email?.toLowerCase() === email.trim().toLowerCase());
     return hit ? { ok: true, foundId: hit.user.id } : { ok: false, error: '이 이메일로 가입된 계정이 없습니다.' };
   }, [server]);
@@ -172,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [server, be]);
 
   const updateProfile = useCallback(async (patch: {
+    username?: string;
     nickname?: string; avatarUrl?: string | null; avatarColor?: string | null; currentPassword?: string; newPassword?: string;
   }): Promise<Result> => {
     if (!user) return { ok: false, error: '로그인이 필요합니다.' };
@@ -180,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!r.ok) return r;
       setUser(u => (u ? {
         ...u,
+        username: patch.username?.trim().toLowerCase() || u.username,
         nickname: patch.nickname?.trim() || u.nickname,
         avatarUrl: patch.avatarUrl === null ? undefined : (patch.avatarUrl ?? u.avatarUrl),
         avatarColor: patch.avatarColor === null ? undefined : (patch.avatarColor ?? u.avatarColor),
@@ -187,18 +191,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: true };
     }
     const reg = mockRegistry();
-    const cur = reg[user.id] ?? (isSetupDone() ? undefined : MOCK_ACCOUNTS[user.id]);
+    const cur = reg[user.username] ?? (isSetupDone() ? undefined : MOCK_ACCOUNTS[user.username]);
     if (!cur) return { ok: false, error: '계정을 찾을 수 없습니다.' };
+    if (patch.username && patch.username.trim() !== user.username) {
+      const nextUsername = patch.username.trim().toLowerCase();
+      if (!/^[a-z0-9_]{3,20}$/.test(nextUsername)) return { ok: false, error: '아이디는 영문 소문자, 숫자, 밑줄만 3~20자로 입력해 주세요.' };
+      if (reg[nextUsername] && nextUsername !== user.username) return { ok: false, error: '이미 사용 중인 아이디입니다.' };
+      delete reg[user.username];
+      reg[nextUsername] = { ...cur, user: { ...cur.user, username: nextUsername } };
+    }
     if (patch.newPassword && patch.currentPassword !== cur.password) {
       return { ok: false, error: '현재 비밀번호가 올바르지 않습니다.' };
     }
     const nextUser: User = {
       ...cur.user,
+      username: patch.username?.trim().toLowerCase() || cur.user.username,
       nickname: patch.nickname?.trim() || cur.user.nickname,
       avatarUrl: patch.avatarUrl === null ? undefined : (patch.avatarUrl ?? cur.user.avatarUrl),
       avatarColor: patch.avatarColor === null ? undefined : (patch.avatarColor ?? cur.user.avatarColor),
     };
-    reg[user.id] = { password: patch.newPassword || cur.password, user: nextUser };
+    const registryKey = nextUser.username;
+    reg[registryKey] = { password: patch.newPassword || cur.password, user: nextUser };
     try {
       localStorage.setItem(MOCK_REG_KEY, JSON.stringify(reg));
       localStorage.setItem(MOCK_KEY, JSON.stringify(nextUser));

@@ -20,6 +20,7 @@ export type BackendConfig =
 /** 로그인 사용자 */
 export interface BackendUser {
   id: string;
+  username: string;
   nickname: string;
   role: 'admin' | 'member';
   email?: string;
@@ -48,16 +49,16 @@ export interface Backend {
   currentUser(): Promise<BackendUser | null>;
   onAuthChange(cb: (u: BackendUser | null) => void): () => void;
   signIn(id: string, password: string): Promise<{ ok: boolean; error?: string }>;
-  signUp(id: string, password: string, nickname: string): Promise<{ ok: boolean; error?: string }>;
+  signUp(username: string, email: string, password: string, nickname: string): Promise<{ ok: boolean; error?: string }>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<{ ok: boolean; error?: string }>;
-  updateProfile(patch: { nickname?: string; avatarUrl?: string | null; avatarColor?: string | null }): Promise<{ ok: boolean; error?: string }>;
+  updateProfile(patch: { username?: string; nickname?: string; avatarUrl?: string | null; avatarColor?: string | null }): Promise<{ ok: boolean; error?: string }>;
   /** 첫 계정을 이 홈의 관리자로 등록 (관리자가 아직 없을 때만) */
   claimOwner(): Promise<{ ok: boolean; error?: string }>;
   /** 가입 회원 목록 — 역극 참여자 선택·회원 관리 화면용.
    *  avatarUrl도 내준다 (v2.0 사용자 제보) — 이미지 정리가 콘텐츠·설정만 훑던 시절, 프로필 사진은
    *  어디에도 참조가 안 잡혀 「아무도 안 쓰는 파일」로 지워졌다. */
-  listMembers(): Promise<{ id: string; nickname: string; role: 'admin' | 'member'; email?: string; avatarUrl?: string }[]>;
+  listMembers(): Promise<{ id: string; username: string; nickname: string; role: 'admin' | 'member'; email?: string; avatarUrl?: string }[]>;
 
   /* ---- 목록(콘텐츠) ---- */
   fetchList<T extends ListItem>(coll: string): Promise<T[]>;

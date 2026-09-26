@@ -38,6 +38,7 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
 
   // 관리자 계정
   const [email, setEmail] = useState('');
+  const [adminUsername, setAdminUsername] = useState('admin');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [nick, setNick] = useState('');
@@ -141,16 +142,17 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
 
   const signUpAdmin = async () => {
     setErr('');
-    if (!email.trim() || !pw) { setErr('이메일과 비밀번호를 입력해 주세요.'); return; }
+    if (!/^[a-z0-9_]{3,20}$/.test(adminUsername.trim().toLowerCase())) { setErr('아이디는 영문 소문자, 숫자, 밑줄만 3~20자로 입력해 주세요.'); return; }
+    if (!email.trim() || !pw) { setErr('아이디, 이메일과 비밀번호를 입력해 주세요.'); return; }
     if (pw !== pw2) { setErr('비밀번호 확인이 일치하지 않습니다.'); return; }
     if (pw.length < 6) { setErr('비밀번호는 6자 이상이어야 합니다.'); return; }
     setSigning(true);
     try {
       const be = await createBackend(cfg());
-      let r = await be.signUp(email.trim(), pw, nick.trim() || email.split('@')[0]);
+      let r = await be.signUp(adminUsername.trim().toLowerCase(), email.trim(), pw, nick.trim() || adminUsername.trim().toLowerCase());
       // 앞선 시도가 저장 도중 끊겨 로그인 계정만 남은 경우 — 같은 비밀번호로 들어가 이어서 진행한다
       if (!r.ok && /이미 사용 중/.test(r.error ?? '')) {
-        const back = await be.signIn(email.trim(), pw);
+        const back = await be.signIn(adminUsername.trim().toLowerCase(), pw);
         r = back.ok ? { ok: true } : {
           ok: false,
           error: '이미 있는 계정입니다 — 비밀번호가 다르다면 Firebase 콘솔의 Authentication → Users에서 그 계정을 지우고 다시 시도해 주세요.',
@@ -393,6 +395,8 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
               <li>
                 <b>관리자 계정 만들기</b>
                 <small>여기서 만드는 첫 계정이 이 홈의 관리자가 됩니다.</small>
+                <label className="k-label">아이디</label>
+                <KInput value={adminUsername} onChange={e => setAdminUsername(e.target.value.toLowerCase())} />
                 <label className="k-label">이메일</label>
                 <KInput value={email} onChange={e => setEmail(e.target.value)} />
                 <div className="setup-2">

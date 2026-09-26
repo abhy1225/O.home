@@ -33,6 +33,8 @@ export default function MyPage() {
   const [cmtRows] = useLocalList<CommentRow>(COMMENT_KEY, COMMENT_SEED);
   const { boards } = useBoards();
 
+  const [username, setUsername] = useState('');
+  const [usernameInit, setUsernameInit] = useState(false);
   const [nick, setNick] = useState('');
   const [nickInit, setNickInit] = useState(false);
   const [curPw, setCurPw] = useState('');
@@ -75,6 +77,7 @@ export default function MyPage() {
   }, [avatarRef, updateProfile]);
 
   // 닉네임 초기값 — user 로드 후 한 번
+  if (user && !usernameInit) { setUsername(user.username); setUsernameInit(true); }
   if (user && !nickInit) { setNick(user.nickname); setNickInit(true); }
 
   if (!user) {
@@ -84,6 +87,17 @@ export default function MyPage() {
       </section>
     );
   }
+
+  const saveUsername = async () => {
+    const value = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(value)) {
+      toast('아이디는 영문 소문자, 숫자, 밑줄만 3~20자로 입력해 주세요');
+      return;
+    }
+    const r = await updateProfile({ username: value });
+    if (r.ok) setUsername(value);
+    toast(r.ok ? '아이디가 변경되었습니다' : r.error!);
+  };
 
   const saveNick = async () => {
     if (!nick.trim()) { toast('닉네임을 입력해 주세요'); return; }
@@ -155,7 +169,11 @@ export default function MyPage() {
             <div style={{ flex: 1, minWidth: 220, display: 'grid', gap: 10 }}>
               <div>
                 <label className="k-label" style={{ marginBottom: 5 }}>아이디</label>
-                <KInput value={user.id} disabled style={{ opacity: 0.6 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <KInput value={username} onChange={e => setUsername(e.target.value.toLowerCase())} style={{ flex: 1 }} />
+                  <button className="btn btn-dark" onClick={saveUsername}>SAVE</button>
+                </div>
+                <p className="hint" style={{ margin: '5px 0 0' }}>영문 소문자, 숫자, 밑줄 3~20자</p>
               </div>
               <div>
                 <label className="k-label" style={{ marginBottom: 5 }}>닉네임</label>

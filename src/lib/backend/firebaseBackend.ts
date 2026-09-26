@@ -110,10 +110,12 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
     let nickname = u.displayName || (u.email ? u.email.split('@')[0] : 'user');
     let avatarUrl: string | undefined;
     let avatarColor: string | undefined;
+    let username = u.email ? u.email.split('@')[0] : u.uid;
     try {
       const p = await getDoc(doc(db, 'profiles', u.uid));
       if (p.exists()) {
-        const d = p.data() as { nickname?: string; avatarUrl?: string; avatarColor?: string };
+        const d = p.data() as { username?: string; nickname?: string; avatarUrl?: string; avatarColor?: string };
+        username = d.username ?? username;
         nickname = d.nickname ?? nickname;
         avatarUrl = d.avatarUrl;
         avatarColor = d.avatarColor;
@@ -122,7 +124,7 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
     const own = await ownerInfo();
     const isAdmin = !!own && (own.uid === u.uid || (own.admins ?? []).includes(u.uid));
     return {
-      id: u.uid, nickname, role: isAdmin ? 'admin' : 'member',
+      id: u.uid, username, nickname, role: isAdmin ? 'admin' : 'member',
       email: u.email ?? undefined, avatarUrl, avatarColor,
     };
   };
@@ -194,19 +196,23 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       return authMod.onAuthStateChanged(auth, u => { void toUser(u).then(cb); });
     },
 
-    async signIn(id, password) {
+    async signIn(username, password) {
       try {
-        await authMod.signInWithEmailAndPassword(auth, id, password);
+        const snap = await getDocs(query(collection(db, 'profiles'), where('username', '==', username.trim().toLowerCase()), limit(1)));
+        const email = snap.empty ? '' : ((snap.docs[0].data() as { email?: string }).email ?? '');
+        // 기존 Firebase 회원은 profiles에 이메일을 저장하지 않으므로 username으로 찾지 못하면
+        // 입력값을 이메일로도 시도해 기존 설치와의 호환성을 유지한다.
+        await authMod.signInWithEmailAndPassword(auth, email || username, password);
         return { ok: true };
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
 
-    async signUp(id, password, nickname) {
+    async signUp(username, email, password, nickname) {
       try {
-        const cred = await authMod.createUserWithEmailAndPassword(auth, id, password);
+        const cred = await authMod.createUserWithEmailAndPassword(auth, email, password);
         await authMod.updateProfile(cred.user, { displayName: nickname });
         const r = await withLimit(
-          setDoc(doc(db, 'profiles', cred.user.uid), { nickname, createdAt: Date.now() }, { merge: true }));
+          setDoc(doc(db, 'profiles', cred.user.uid), { username: username.trim().toLowerCase(), email: email.trim(), nickname, createdAt: Date.now() }, { merge: true }));
         // 계정(Auth)은 이미 만들어졌으므로 그 사실을 알려 준다 — 다시 시도하면 "이미 사용 중"이 뜬다
         if (r === TIMEOUT) return { ok: false, error: `${NO_REACH} (로그인 계정은 이미 만들어졌습니다)` };
         return { ok: true };
@@ -227,6 +233,7 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       if (!u) return { ok: false, error: '로그인이 필요합니다.' };
       try {
         const row: Record<string, unknown> = {};
+        if (patch.username !== undefined) row.username = patch.username.trim().toLowerCase();
         if (patch.nickname !== undefined) row.nickname = patch.nickname;
         if (patch.avatarUrl !== undefined) row.avatarUrl = patch.avatarUrl ?? null;
         if (patch.avatarColor !== undefined) row.avatarColor = patch.avatarColor ?? null;
@@ -256,9 +263,10 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       const snap = await getDocs(collection(db, 'profiles'));
       return snap.docs.map(d => {
         // avatarUrl도 함께 — 이미지 정리가 프로필 사진을 「안 쓰는 파일」로 지우지 않게 (v2.0 사용자 제보)
-        const v = d.data() as { nickname?: string; avatarUrl?: string };
+        const v = d.data() as { username?: string; nickname?: string; avatarUrl?: string };
         return {
           id: d.id,
+          username: v.username ?? d.id,
           nickname: v.nickname ?? d.id,
           role: (admins.has(d.id) ? 'admin' : 'member') as 'admin' | 'member',
           avatarUrl: v.avatarUrl,

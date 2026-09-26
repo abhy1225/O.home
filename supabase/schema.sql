@@ -7,6 +7,7 @@
 -- ── 1. 회원 프로필 ───────────────────────────────────────────
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  username text not null,
   nickname text not null,
   role text not null default 'member' check (role in ('admin', 'member')),
   avatar_url text,
@@ -14,6 +15,42 @@ create table if not exists public.profiles (
   tags text[] not null default '{}',
   created_at timestamptz not null default now()
 );
+
+-- 기존 설치본 마이그레이션: username 컬럼 추가 + 기존 회원 임시 아이디 부여
+alter table public.profiles add column if not exists username text;
+update public.profiles
+set username = 'user_' || left(replace(id::text, '-', ''), 8)
+where username is null;
+alter table public.profiles alter column username set not null;
+create unique index if not exists profiles_username_lower_unique
+on public.profiles (lower(username));
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'profiles_username_format'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles add constraint profiles_username_format
+      check (username ~ '^[a-z0-9_]{3,20}$');
+  end if;
+end $$;
+
+-- 로그인 시 username → 실제 이메일을 찾아 주는 함수. 이메일은 응답으로 노출되지만
+-- 함수 호출 결과는 로그인 직전에만 사용되며, UI에는 이메일을 표시하지 않는다.
+create or replace function public.resolve_login_email(p_username text)
+returns text
+language sql
+security definer
+set search_path = public
+as $$
+  select u.email
+  from auth.users u
+  join public.profiles p on p.id = u.id
+  where lower(p.username) = lower(trim(p_username))
+  limit 1;
+$$;
+grant execute on function public.resolve_login_email(text) to anon, authenticated;
 
 -- ── 2. 가입코드 (초대코드 방식) ──────────────────────────────
 create table if not exists public.invite_codes (
@@ -42,9 +79,13 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare existing int;
 begin
   select count(*) into existing from public.profiles;
-  insert into public.profiles (id, nickname, role)
+  insert into public.profiles (id, username, nickname, role)
   values (
     new.id,
+    coalesce(
+      nullif(lower(trim(new.raw_user_meta_data->>'username')), ''),
+      'user_' || left(replace(new.id::text, '-', ''), 8)
+    ),
     coalesce(new.raw_user_meta_data->>'nickname', split_part(new.email, '@', 1)),
     case when existing = 0 then 'admin' else 'member' end
   );

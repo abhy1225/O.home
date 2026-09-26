@@ -19,9 +19,10 @@ export async function createSupabaseBackend(
   const toUser = async (u: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null | undefined): Promise<BackendUser | null> => {
     if (!u) return null;
     const { data: prof } = await sb.from('profiles')
-      .select('nickname, role, avatar_url, avatar_color').eq('id', u.id).maybeSingle();
+      .select('username, nickname, role, avatar_url, avatar_color').eq('id', u.id).maybeSingle();
     return {
       id: u.id,
+      username: prof?.username ?? (u.user_metadata?.username as string) ?? (u.email?.split('@')[0] ?? 'user'),
       nickname: prof?.nickname ?? (u.user_metadata?.nickname as string) ?? u.email ?? 'user',
       role: (prof?.role as 'admin' | 'member') ?? 'member',
       email: u.email,
@@ -81,13 +82,31 @@ export async function createSupabaseBackend(
       return () => sub.subscription.unsubscribe();
     },
 
-    async signIn(id, password) {
-      const { error } = await sb.auth.signInWithPassword({ email: id, password });
-      return error ? { ok: false, error: error.message } : { ok: true };
+    async signIn(username, password) {
+      const { data: email, error: lookupError } = await sb.rpc('resolve_login_email', {
+        p_username: username.trim(),
+      });
+      if (lookupError || !email) {
+        return { ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' };
+      }
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      return error ? { ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' } : { ok: true };
     },
 
-    async signUp(id, password, nickname) {
-      const { error } = await sb.auth.signUp({ email: id, password, options: { data: { nickname } } });
+    async signUp(username, email, password, nickname) {
+      const cleanUsername = username.trim().toLowerCase();
+      if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
+        return { ok: false, error: '아이디는 영문 소문자, 숫자, 밑줄만 3~20자로 입력해 주세요.' };
+      }
+      const { data: existing, error: lookupError } = await sb
+        .from('profiles').select('id').eq('username', cleanUsername).maybeSingle();
+      if (lookupError) return { ok: false, error: lookupError.message };
+      if (existing) return { ok: false, error: '이미 사용 중인 아이디입니다.' };
+      const { error } = await sb.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { username: cleanUsername, nickname } },
+      });
       return error ? { ok: false, error: error.message } : { ok: true };
     },
 
@@ -97,58 +116,63 @@ export async function createSupabaseBackend(
       const { error } = await sb.auth.resetPasswordForEmail(email);
       return error ? { ok: false, error: error.message } : { ok: true };
     },
-    
-async updateProfile(patch) {
-  const { data } = await sb.auth.getUser();
-  if (!data.user) return { ok: false, error: '로그인이 필요합니다.' };
 
-  const { data: profile, error: profileError } = await sb
-    .from('profiles')
-    .select('nickname')
-    .eq('id', data.user.id)
-    .maybeSingle();
+    async updateProfile(patch) {
+      const { data } = await sb.auth.getUser();
+      if (!data.user) return { ok: false, error: '로그인이 필요합니다.' };
 
-  if (profileError) {
-    return { ok: false, error: profileError.message };
-  }
+      // 프로필 행이 없는 오래된 계정도 nickname NOT NULL 제약을 만족하도록 기존 값을 먼저 읽는다.
+      const { data: profile, error: profileError } = await sb
+        .from('profiles')
+        .select('username, nickname')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      if (profileError) return { ok: false, error: profileError.message };
 
-  const fallbackNickname =
-    (data.user.user_metadata?.nickname as string | undefined)?.trim() ||
-    data.user.email?.split('@')[0] ||
-    'user';
+      if (patch.username !== undefined) {
+        const username = patch.username.trim().toLowerCase();
+        if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+          return { ok: false, error: '아이디는 영문 소문자, 숫자, 밑줄만 3~20자로 입력해 주세요.' };
+        }
+        const { data: existing, error: usernameError } = await sb
+          .from('profiles')
+          .select('id')
+          .eq('username', username)
+          .neq('id', data.user.id)
+          .maybeSingle();
+        if (usernameError) return { ok: false, error: usernameError.message };
+        if (existing) return { ok: false, error: '이미 사용 중인 아이디입니다.' };
+      }
 
-  const row: Record<string, unknown> = {
-    id: data.user.id,
-    nickname: patch.nickname?.trim() || profile?.nickname || fallbackNickname,
-  };
+      const fallbackUsername =
+        (data.user.user_metadata?.username as string | undefined)?.trim() ||
+        data.user.email?.split('@')[0] || 'user';
+      const fallbackNickname =
+        (data.user.user_metadata?.nickname as string | undefined)?.trim() ||
+        profile?.nickname || data.user.email?.split('@')[0] || 'user';
 
-  if (patch.avatarUrl !== undefined) {
-    row.avatar_url = patch.avatarUrl;
-  }
+      const row: Record<string, unknown> = {
+        id: data.user.id,
+        username: patch.username?.trim().toLowerCase() || profile?.username || fallbackUsername,
+        nickname: patch.nickname?.trim() || profile?.nickname || fallbackNickname,
+      };
+      if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+      if (patch.avatarColor !== undefined) row.avatar_color = patch.avatarColor;
+      const { error } = await sb.from('profiles').upsert(row, { onConflict: 'id' });
+      return error ? { ok: false, error: error.message } : { ok: true };
+    },
 
-  if (patch.avatarColor !== undefined) {
-    row.avatar_color = patch.avatarColor;
-  }
-
-  const { error } = await sb
-    .from('profiles')
-    .upsert(row, { onConflict: 'id' });
-
-  return error
-    ? { ok: false, error: error.message }
-    : { ok: true };
-},
     // Supabase는 스키마의 트리거가 첫 가입자를 관리자로 만들어 준다 — 추가 작업 없음
     async claimOwner() { return { ok: true }; },
 
     async listMembers() {
       // avatar_url도 함께 — 이미지 정리가 프로필 사진을 「안 쓰는 파일」로 지우지 않게 (v2.0 사용자 제보)
-      const { data, error } = await sb.from('profiles').select('id, nickname, role, avatar_url').order('created_at');
+      const { data, error } = await sb.from('profiles').select('id, username, nickname, role, avatar_url').order('created_at');
       if (error) throw error;
       return (data ?? []).map(r => {
-        const p = r as { id: string; nickname: string; role: string; avatar_url?: string | null };
+        const p = r as { id: string; username?: string; nickname: string; role: string; avatar_url?: string | null };
         return {
-          id: p.id, nickname: p.nickname, role: (p.role as 'admin' | 'member') ?? 'member',
+          id: p.id, username: p.username ?? p.id, nickname: p.nickname, role: (p.role as 'admin' | 'member') ?? 'member',
           avatarUrl: p.avatar_url ?? undefined,
         };
       });
