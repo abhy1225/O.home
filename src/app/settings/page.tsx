@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 환경설정 (기획서 5장) — 0차: 「디자인」 탭(테마) 실동작.
 // 나머지 카테고리는 해당 기능 마일스톤에서 함께 구현.
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -2198,6 +2198,25 @@ function MenuPane() {
     setTree(tree.map(g => (g.id === gid ? { ...g, items: g.items.filter(i => i.href !== href) } : g)));
     markRemoved([href]);
   };
+  // 단독 메뉴를 상위 카테고리로 전환 — 기존 페이지는 첫 하위 메뉴로 그대로 보존한다.
+  // 예: 「캐릭터 /chars」 → 「캐릭터」 > 「캐릭터 /chars」. 이후 미배치 기능을 같은 그룹에 추가 가능.
+  const makeGroupFromSolo = (g: MenuGroupNode) => {
+    if (!g.href) return;
+    const href = g.href;
+    const leaf: MenuLeaf = {
+      href,
+      label: g.label,
+      ...(g.pageTitle ? { pageTitle: g.pageTitle } : {}),
+    };
+    setTree(tree.map(x => (x.id === g.id
+      ? {
+          id: x.id, label: x.label, items: [leaf],
+          ...(x.vis ? { vis: x.vis } : {}),
+          ...(x.open ? { open: x.open } : {}),
+          ...(x.visMembers?.length ? { visMembers: x.visMembers } : {}),
+        }
+      : x)));
+  };
   const moveItem = (fromGid: string, it: MenuLeaf, to: string) => {
     const stripped = tree.map(g => (g.id === fromGid ? { ...g, items: g.items.filter(i => i.href !== it.href) } : g));
     if (to === 'solo') {
@@ -2515,6 +2534,12 @@ function MenuPane() {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {g.href && extraFor(g.href)}
+                {g.href && (
+                  <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
+                    onClick={() => makeGroupFromSolo(g)} title="이 메뉴를 상위 카테고리로 바꾸고 하위 메뉴를 넣습니다">
+                    ＋ 하위
+                  </button>
+                )}
                 <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
                   onClick={() => askRemoveGroup(g)}>{g.href ? '빼기' : 'DELETE'}</button>
               </div>
