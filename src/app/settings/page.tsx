@@ -992,6 +992,11 @@ function MemberPane() {
     return '';
   })();
   const [delMember, setDelMember] = useState<{ id: string; nickname: string } | null>(null);
+  // 관리자 비밀번호 초기화 — 실제 변경은 서버 API에서 관리자 권한을 다시 확인한 뒤 수행
+  const [pwMember, setPwMember] = useState<{ id: string; nickname: string } | null>(null);
+  const [tempPw, setTempPw] = useState('');
+  const [tempPw2, setTempPw2] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
   const registry = (() => {
     try { return JSON.parse(localStorage.getItem('ohome.mockreg.v1') ?? '{}') as Record<string, unknown>; } catch { return {}; }
   })();
@@ -1103,6 +1108,12 @@ function MemberPane() {
                 onClick={() => { setTagFor(m.id); setTagInput(''); }}>＋</span>
             )}
             <span className="pill" style={{ marginLeft: 'auto' }}>{isAdminOf(m) ? '관리자' : '회원'}</span>
+            {!isBase && !isAdminOf(m) && serverOn2 && (
+              <button className="btn btn-ghost" style={{ padding: '4px 11px', fontSize: 10.5, borderRadius: 20, lineHeight: 'normal', letterSpacing: '.04em' }}
+                onClick={() => { setPwMember({ id: m.id, nickname: m.nickname }); setTempPw(''); setTempPw2(''); }}>
+                PW RESET
+              </button>
+            )}
             {!isBase && !isAdminOf(m) && (
               // 회원 뱃지(.pill)와 같은 규격 — padding·글씨·radius 동일 (v1.9)
               <button className="btn btn-ghost" style={{ padding: '4px 11px', fontSize: 10.5, borderRadius: 20, lineHeight: 'normal', letterSpacing: '.04em' }}
@@ -1129,6 +1140,39 @@ function MemberPane() {
           <Pager page={mPage} total={Math.ceil(filteredMembers.length / PER_MEMBERS)} onChange={setMPage} />
         </div>
       )}
+      <Modal open={pwMember !== null} small title={`「${pwMember?.nickname ?? ''}」 비밀번호 초기화`}
+        desc="친구에게 전달할 임시 비밀번호를 새로 지정합니다. 기존 비밀번호는 확인할 수 없습니다."
+        onClose={() => { if (!pwBusy) { setPwMember(null); setTempPw(''); setTempPw2(''); } }}
+        dirty={!!tempPw || !!tempPw2}
+        actions={<>
+          <button className="btn btn-ghost" disabled={pwBusy}
+            onClick={() => { setPwMember(null); setTempPw(''); setTempPw2(''); }}>CANCEL</button>
+          <button className="btn btn-dark" disabled={pwBusy}
+            onClick={async () => {
+              if (!pwMember) return;
+              if (tempPw.length < 6) { toast('임시 비밀번호는 6자 이상 입력해 주세요'); return; }
+              if (tempPw !== tempPw2) { toast('비밀번호 확인이 일치하지 않습니다'); return; }
+              const be = backend();
+              if (!be) { toast('서버 연결을 확인해 주세요'); return; }
+              setPwBusy(true);
+              const r = await be.adminResetPassword(pwMember.id, tempPw);
+              setPwBusy(false);
+              if (!r.ok) { toast(r.error ?? '비밀번호 초기화에 실패했습니다'); return; }
+              toast(`${pwMember.nickname}님의 비밀번호를 초기화했습니다`);
+              setPwMember(null); setTempPw(''); setTempPw2('');
+            }}>{pwBusy ? 'RESETTING…' : 'RESET'}</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <label className="k-label">새 임시 비밀번호</label>
+          <KInput type="password" autoComplete="new-password" value={tempPw}
+            onChange={e => setTempPw(e.target.value)} placeholder="6자 이상" />
+          <label className="k-label">새 임시 비밀번호 확인</label>
+          <KInput type="password" autoComplete="new-password" value={tempPw2}
+            onChange={e => setTempPw2(e.target.value)} placeholder="한 번 더 입력" />
+          <p className="hint" style={{ margin: '2px 0 0' }}>초기화 후 회원은 아이디 + 이 임시 비밀번호로 로그인할 수 있습니다.</p>
+        </div>
+      </Modal>
+
       {/* 회원 내보내기 — 계정 삭제는 콘솔에서만 되므로 두 단계를 한 흐름으로 안내 (v2.0 사용자 확정) */}
       <ConfirmModal open={delMember !== null} title={`회원 「${delMember?.nickname ?? ''}」 내보내기`}
         wide
