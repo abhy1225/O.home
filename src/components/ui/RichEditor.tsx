@@ -5,14 +5,37 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
-import { Extension, Node, mergeAttributes } from '@tiptap/core';
+import { Extension, Mark, Node, mergeAttributes } from '@tiptap/core';
 import { putBlob } from '@/lib/blobStore';
 import { useToast } from '@/components/ui/Toast';
+import { useFonts } from '@/lib/fontStore';
 
 
 
 // 문단별 정렬·줄간격을 HTML style로 저장한다. 별도 패키지 없이 TipTap의 paragraph/heading에
 // 속성만 확장하므로 기존 글과도 호환된다. 값이 없으면 환경설정의 전역 줄간격을 따른다.
+
+
+// 선택한 글자(또는 현재 커서 이후 입력)에 개별 글꼴을 적용한다.
+// span의 inline font-family로 저장하므로 게시글을 다시 열어도 글꼴 정보가 유지된다.
+const EditorFont = Mark.create({
+  name: 'editorFont',
+  addAttributes() {
+    return {
+      family: {
+        default: null,
+        parseHTML: el => (el as HTMLElement).style.fontFamily || null,
+        renderHTML: attrs => attrs.family ? { style: `font-family:${attrs.family}` } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[style*="font-family"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(HTMLAttributes), 0];
+  },
+});
 
 const Video = Node.create({
   name: 'video',
@@ -85,12 +108,13 @@ export function RichEditor({ value, onChange, placeholder }: {
   placeholder?: string;
 }) {
   const toast = useToast();
+  const { fonts, familyOf } = useFonts();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const editor = useEditor({
-    extensions: [StarterKit, Image, Video, ParagraphFormat],
+    extensions: [StarterKit, Image, Video, ParagraphFormat, EditorFont],
     content: value || '<p></p>',
     immediatelyRender: false,
     editorProps: {
@@ -110,6 +134,18 @@ export function RichEditor({ value, onChange, placeholder }: {
     || editor?.getAttributes('heading').textAlign || 'left';
   const currentLineHeight = editor?.getAttributes('paragraph').lineHeight
     || editor?.getAttributes('heading').lineHeight || '';
+  const currentFontFamily = editor?.getAttributes('editorFont').family || '';
+
+  const setEditorFont = (fontId: string) => {
+    if (!editor) return;
+    if (!fontId) {
+      editor.chain().focus().unsetMark('editorFont').run();
+      return;
+    }
+    const family = familyOf(fontId);
+    if (!family) return;
+    editor.chain().focus().setMark('editorFont', { family }).run();
+  };
 
   // 외부 값이 완전히 바뀐 경우(탭 전환) 동기화
   useEffect(() => {
@@ -157,6 +193,17 @@ export function RichEditor({ value, onChange, placeholder }: {
   return (
     <div className="re-wrap">
       <div className="re-toolbar">
+        <select className="re-select" title="글꼴" aria-label="글꼴"
+          value={fonts.find(f => familyOf(f.id) === currentFontFamily)?.id || ''}
+          onMouseDown={e => e.stopPropagation()}
+          onChange={e => setEditorFont(e.target.value)}
+          style={{ maxWidth: 150 }}>
+          <option value="">기본 글꼴</option>
+          {fonts.map(f => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+        <span className="re-sep" />
         <TBtn title="굵게" label={<b>B</b>} on={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()} />
         <TBtn title="기울임" label={<i>I</i>} on={editor.isActive('italic')}
