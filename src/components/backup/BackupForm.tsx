@@ -1,7 +1,7 @@
 'use client';
 // 그림백업 작성/수정 공용 폼 (4.11) — 제목/유형/이미지 다중 업로드(원본·최적화·크롭·⠿순서)/설명/설정/접기
 // 수정 모드: 기존 이미지(ref)는 그대로 유지·재정렬·삭제 가능, 새 파일 추가 가능
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId, FoldType } from '@/lib/postStore';
@@ -28,10 +28,16 @@ interface UpFile {
 
 const fmtSize = (b?: number) => b == null ? '' : b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
 
+function isVideoRef(ref?: string) {
+  return !!ref && (/\.(mp4|webm|mov)(?:[?#].*)?$/i.test(ref) || /\/video\/upload\//i.test(ref));
+}
+
 function FilePreview({ f }: { f: UpFile }) {
   const loaded = useBlobUrl(f.ref);
   const src = f.url ?? loaded;
   if (!src) return null;
+  const video = f.file?.type.startsWith('video/') || isVideoRef(f.ref);
+  if (video) return <video src={src} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={f.name} />;
 }
@@ -90,6 +96,9 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
   const [foldType, setFoldType] = useState<FoldType | 'none'>(initial?.fold?.type ?? 'none');
   const [foldLabel, setFoldLabel] = useState(initial?.fold?.label ?? '');
   const [cropFor, setCropFor] = useState<UpFile | null>(null);
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) {
     return (
@@ -113,12 +122,22 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
 
   const addFiles = (list: FileList | null) => {
     if (!list || list.length === 0) return;
+    const bad = Array.from(list).find(x => !x.type.startsWith('image/') && !x.type.startsWith('video/'));
+    if (bad) { toast('이미지, GIF 또는 동영상 파일만 추가할 수 있습니다'); return; }
     // input.files는 라이브 FileList — 핸들러가 끝나며 value가 초기화되면 비워지므로
     // 상태 업데이터(나중에 실행) 안이 아니라 지금 즉시 복사해야 함 (업로드가 번갈아 씹히던 버그)
     const items: UpFile[] = Array.from(list).map(x => ({
       id: newId(), name: x.name, size: x.size, url: URL.createObjectURL(x), file: x, original: true,
     }));
     setFiles(f => [...f, ...items]);
+  };
+
+  const addUrl = () => {
+    const src = mediaUrl.trim();
+    if (!/^https?:\/\//i.test(src)) { toast('http:// 또는 https://로 시작하는 주소를 입력해 주세요'); return; }
+    setFiles(f => [...f, { id: newId(), name: isVideoRef(src) ? '동영상 URL' : '이미지 URL', ref: src, original: true }]);
+    setMediaUrl('');
+    setUrlOpen(false);
   };
 
   const post = async () => {
@@ -173,19 +192,29 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
                 label={<span>단일(세로) <span className="rd-desc">— 이미지 사이 갭을 두고 세로로 나열</span></span>} />
             </div>
           </div>
-          <label className="k-label">이미지</label>
-          <div className="upzone" onClick={() => document.getElementById('bkFiles')?.click()}
+          <label className="k-label">미디어</label>
+          <div className="upzone" onClick={() => fileInputRef.current?.click()}
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files); }}>
             <b style={{ display: 'block', marginBottom: 3 }}>
-              {files.length === 0 ? '이미지를 끌어다 놓거나 클릭해서 선택' : '＋ ADD IMAGE'}
+              {files.length === 0 ? '이미지·GIF·동영상을 끌어다 놓거나 클릭해서 선택' : '＋ ADD MEDIA'}
             </b>
-            여러 장 선택 가능 · ⠿ 드래그로 순서 조정
+            여러 개 선택 가능 · ⠿ 드래그로 순서 조정
           </div>
-          <input id="bkFiles" type="file" accept="image/*" multiple style={{ display: 'none' }}
+          <input ref={fileInputRef} id="bkFiles" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" multiple style={{ display: 'none' }}
             onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+          <div style={{ marginTop: 7 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setUrlOpen(v => !v)}>🔗 URL로 추가</button>
+          </div>
+          {urlOpen && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+              <KInput value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} placeholder="이미지/GIF/MP4 직접 주소 (https://...)" style={{ flex: 1 }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addUrl(); } }} />
+              <button type="button" className="btn btn-dark" onClick={addUrl}>추가</button>
+            </div>
+          )}
           {files.length > 0 && (
-            <div className="upfile-count">✓ {files.length}장 — 아래 순서대로 게시됩니다</div>
+            <div className="upfile-count">✓ {files.length}개 — 아래 순서대로 게시됩니다</div>
           )}
           <DragList
             items={files}
@@ -208,7 +237,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
                     onClick={() => setFiles(l => l.map(x => x.id === f.id ? { ...x, original: false } : x))}>최적화</button>
                 </div>
                 <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 10, whiteSpace: 'nowrap' }}
-                  onClick={() => setCropFor(f)}>✂ 썸네일</button>
+                  disabled={f.file?.type.startsWith('video/') || isVideoRef(f.ref)} onClick={() => setCropFor(f)}>✂ 썸네일</button>
                 <span className="fx" data-tip="제거"
                   onClick={() => del.ask('이 이미지를 목록에서 빼시겠습니까?',
                     () => setFiles(l => l.filter(x => x.id !== f.id)), f.name)}>✕</span>

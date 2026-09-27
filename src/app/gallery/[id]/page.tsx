@@ -14,6 +14,8 @@ import { PageTitle } from '@/components/ui/PageText';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { useBoardSettings, boardBadgeStyle } from '@/lib/boardStore';
 
+const isVideoRef = (ref?: string) => !!ref && (/\.(mp4|webm|mov)(?:[?#].*)?$/i.test(ref) || /\/video\/upload\//i.test(ref));
+
 export default function BackupDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -54,6 +56,11 @@ export default function BackupDetailPage() {
   const Img = ({ im, ratio, natural }: { im: { url?: string; ph?: string }; ratio?: string; natural?: boolean }) => {
     const u = useBlobUrl(im.url);
     if (u) {
+      if (isVideoRef(im.url)) {
+        return <video src={u} controls playsInline preload="metadata" style={natural
+          ? { maxWidth: '100%', maxHeight: '100%', display: 'block' }
+          : { width: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />;
+      }
       // eslint-disable-next-line @next/next/no-img-element
       // 원본보다 크게 늘리지 않는다 — 폭이 모자랄 때만 줄이고, 작은 그림은 작은 그대로 (v2.0 사용자 확정)
       return <img src={u} alt="" style={natural
@@ -102,8 +109,8 @@ export default function BackupDetailPage() {
           /* 단일(세로정렬) (v1.9) — 로그와 달리 이미지 사이 갭을 두고 세로로 나열, 클릭 확대 */
           <div style={{ display: 'grid', gap: 14 }}>
             {imgs.map((im, i) => (
-              <div key={i} style={{ borderRadius: 10, overflow: 'hidden', cursor: im.url ? 'zoom-in' : undefined }}
-                onClick={() => { if (im.url) { setCur(i); setLbOpen(true); } }}>
+              <div key={i} style={{ borderRadius: 10, overflow: 'hidden', cursor: im.url && !isVideoRef(im.url) ? 'zoom-in' : undefined }}
+                onClick={() => { if (im.url && !isVideoRef(im.url)) { setCur(i); setLbOpen(true); } }}>
                 <Img im={im} />
               </div>
             ))}
@@ -116,9 +123,9 @@ export default function BackupDetailPage() {
                   grid는 암시적 row가 콘텐츠 높이로 늘어나 max-height:100%가 무력화됨(세로 긴 그림 잘림) → flex (v1.9) */}
               <div style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: imgs[cur].url ? 'zoom-in' : undefined,
+                cursor: imgs[cur].url && !isVideoRef(imgs[cur].url) ? 'zoom-in' : undefined,
               }}
-                onClick={() => { if (imgs[cur].url) setLbOpen(true); }}>
+                onClick={() => { if (imgs[cur].url && !isVideoRef(imgs[cur].url)) setLbOpen(true); }}>
                 <Img im={imgs[cur]} natural />
               </div>
               {imgs.length > 1 && (
@@ -144,7 +151,7 @@ export default function BackupDetailPage() {
       </div>
 
       {/* 단일형·단일(세로) 확대 보기 — 뷰어와 같은 순번에서 시작, ‹ ›로 이어 넘김 */}
-      {lbOpen && (p.type === 'single' || p.type === 'vlist') && p.images.length > 0 && (
+      {lbOpen && (p.type === 'single' || p.type === 'vlist') && p.images.length > 0 && !isVideoRef(p.images[cur]) && (
         <Lightbox srcs={p.images} index={cur} onClose={() => setLbOpen(false)} />
       )}
 
