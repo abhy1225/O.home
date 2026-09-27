@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 메뉴 관리 (5.2 — 메뉴 선택제) — 상위 메뉴를 자유롭게 만들고(생성·삭제·이름·순서)
 // 하위 메뉴(기능 모듈)를 원하는 상위에 배치하는 자유 트리 (v1.9 개편).
 // 트리에서 뺀 기능은 노출만 사라지고 데이터는 보존 (3장 원칙).
@@ -357,7 +357,8 @@ export function buildMenu(
           return def === null ? null : { href: it.href, label: it.label ?? def };
         })
         .filter((c): c is { href: string; label: string } => !!c);
-      return { label: g.label, children };
+      // 상위 그룹 자체도 랜딩 페이지를 가진다. 하위 메뉴는 드롭다운으로 그대로 유지.
+      return { label: g.label, href: `/menu/${encodeURIComponent(g.id)}`, children };
     })
     .filter((m): m is MenuItem => !!m);
 

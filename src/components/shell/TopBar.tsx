@@ -1,6 +1,6 @@
 'use client';
 // 상단 바 — 기획서 3장(계층 메뉴) + 4.0(프로필 드롭다운 · 편집모드 · 그리드 토글)
-// 로고 클릭 = 메인 이동 (v1.5) · 상위 메뉴 클릭 = 첫 하위 페이지 이동 (v1.8)
+// 로고 클릭 = 메인 이동 (v1.5) · 상위 메뉴 클릭 = 그룹 랜딩 페이지 이동
 // 편집모드 중 페이지 이동 시도 → 종료 확인 모달 (v1.8)
 import React, { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -157,8 +157,8 @@ export function TopBar() {
         {visMenu.map(item =>
           item.children ? (
             <div className="grp" key={item.label}>
-              {/* 상위 클릭 → 첫 하위 페이지 (v1.8) · 안 읽은 알림이 있는 메뉴에 점 (4.13) */}
-              <button onClick={() => nav(item.children![0].href)}>
+              {/* 상위 클릭 → 하위 메뉴 모아보기 랜딩 페이지 · 안 읽은 알림이 있는 메뉴에 점 */}
+              <button onClick={() => nav(item.href!)}>
                 {item.label}{item.children.some(c => dotHrefs.has(c.href)) && <small className="nd">●</small>}
               </button>
               <div className="sub">
@@ -189,7 +189,7 @@ export function TopBar() {
               {moreMenu.map(item =>
                 item.children ? (
                   <div className="sub-grp" key={item.label}>
-                    <div className="sub-cap">{item.label}</div>
+                    <button className="sub-cap" onClick={() => nav(item.href!)}>{item.label}</button>
                     {item.children.map(c => (
                       <button key={c.href} onClick={() => nav(c.href)}>
                         {c.label}{dotHrefs.has(c.href) && <small className="nd">●</small>}
