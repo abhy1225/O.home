@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
-import { Extension } from '@tiptap/core';
+import { Extension, Node, mergeAttributes } from '@tiptap/core';
 import { putBlob } from '@/lib/blobStore';
 import { useToast } from '@/components/ui/Toast';
 
@@ -13,6 +13,24 @@ import { useToast } from '@/components/ui/Toast';
 
 // 문단별 정렬·줄간격을 HTML style로 저장한다. 별도 패키지 없이 TipTap의 paragraph/heading에
 // 속성만 확장하므로 기존 글과도 호환된다. 값이 없으면 환경설정의 전역 줄간격을 따른다.
+
+const Video = Node.create({
+  name: 'video',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return { src: { default: null }, controls: { default: true } };
+  },
+  parseHTML() { return [{ tag: 'video[src]' }]; },
+  renderHTML({ HTMLAttributes }) {
+    return ['video', mergeAttributes(HTMLAttributes, { controls: 'controls', playsinline: 'playsinline', style: 'max-width:100%;height:auto;' })];
+  },
+});
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(url) || /\/video\/upload\//i.test(url);
+}
+
 const ParagraphFormat = Extension.create({
   name: 'paragraphFormat',
   addGlobalAttributes() {
@@ -69,8 +87,10 @@ export function RichEditor({ value, onChange, placeholder }: {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState('');
   const editor = useEditor({
-    extensions: [StarterKit, Image, ParagraphFormat],
+    extensions: [StarterKit, Image, Video, ParagraphFormat],
     content: value || '<p></p>',
     immediatelyRender: false,
     editorProps: {
@@ -105,16 +125,31 @@ export function RichEditor({ value, onChange, placeholder }: {
      다른 이미지들과 같은 경로(putBlob)를 타므로 서버 모드면 저장소에 올라가고 공개 주소가 나온다.
      서버가 없는 로컬 모드에서는 그 주소가 이 브라우저 안에서만 뜻이 있는 파일 id라
      <img>가 읽지 못한다 — 그때만 본문에 그대로 심는다(개발·오프라인용). */
-  const insertImage = async (f?: File) => {
+  const insertMediaUrl = (raw: string) => {
+    const src = raw.trim();
+    if (!/^https?:\/\//i.test(src)) { toast('http:// 또는 https://로 시작하는 주소를 입력해 주세요'); return; }
+    if (isVideoUrl(src)) editor.chain().focus().insertContent({ type: 'video', attrs: { src } }).run();
+    else editor.chain().focus().setImage({ src }).run();
+    setMediaUrl('');
+    setUrlOpen(false);
+  };
+
+  const insertMedia = async (f?: File) => {
     if (!f) return;
+    if (!f.type.startsWith('image/') && !f.type.startsWith('video/')) {
+      toast('이미지, GIF 또는 동영상 파일만 올릴 수 있습니다'); return;
+    }
+    // Cloudinary 무료 플랜의 기본 최대치에 맞춘 클라이언트 가드. GIF는 image로 취급된다.
+    const max = f.type.startsWith('video/') ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (f.size > max) { toast(`파일이 너무 큽니다 — ${f.type.startsWith('video/') ? '동영상 100MB' : '이미지/GIF 10MB'} 이하로 올려 주세요`); return; }
     setBusy(true);
     try {
       const ref = await putBlob(f);
       const src = /^https?:/.test(ref) ? ref : await toDataUrl(f);
-      editor.chain().focus().setImage({ src }).run();
+      if (f.type.startsWith('video/')) editor.chain().focus().insertContent({ type: 'video', attrs: { src } }).run();
+      else editor.chain().focus().setImage({ src }).run();
     } catch (e) {
-      // 조용히 실패하면 「올렸는데 왜 안 들어가지」가 된다 — 사유를 그대로 보여 준다
-      toast(`이미지를 올리지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
+      toast(`미디어를 올리지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
     }
     setBusy(false);
   };
@@ -152,10 +187,12 @@ export function RichEditor({ value, onChange, placeholder }: {
           {LINE_HEIGHT_OPTIONS.map(o => <option key={o.value || 'default'} value={o.value}>{o.label}</option>)}
         </select>
         <span className="re-sep" />
-        <TBtn title={busy ? '올리는 중…' : '이미지 올리기'} label={busy ? '⏳' : '🖼'}
+        <TBtn title={busy ? '올리는 중…' : '이미지·GIF·동영상 올리기'} label={busy ? '⏳' : '🖼'}
           onClick={() => { if (!busy) fileRef.current?.click(); }} />
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void insertImage(f); }} />
+        <TBtn title="이미지·동영상 URL로 삽입" label="🔗" on={urlOpen}
+          onClick={() => setUrlOpen(v => !v)} />
+        <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void insertMedia(f); }} />
         {/* 실행 취소·다시 실행은 모바일에서 숨김 — 툴바가 두 줄로 넘어가 본문 영역을 침범 (v1.9 사용자 확정)
             (단축키 Ctrl+Z / Ctrl+Shift+Z는 그대로 동작) */}
         <span className="re-sep re-hide-m" />
@@ -164,6 +201,14 @@ export function RichEditor({ value, onChange, placeholder }: {
           <TBtn title="다시 실행" label="↷" onClick={() => editor.chain().focus().redo().run()} />
         </span>
       </div>
+      {urlOpen && (
+        <div style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line, #ddd)' }}>
+          <input className="k-input" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); insertMediaUrl(mediaUrl); } }}
+            placeholder="이미지/GIF/MP4 직접 주소 (https://...)" style={{ flex: 1 }} />
+          <button type="button" className="btn btn-dark" onClick={() => insertMediaUrl(mediaUrl)}>삽입</button>
+        </div>
+      )}
       {/* 플레이스홀더는 본문 영역 기준으로 — 툴바가 두 줄이 돼도 안 밀림 (v1.9 사용자 발견) */}
       <div className="re-body">
         <EditorContent editor={editor} />

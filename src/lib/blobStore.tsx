@@ -18,6 +18,9 @@ function extOf(blob: Blob): string {
   if (t.includes('webp')) return 'webp';
   if (t.includes('svg')) return 'svg';
   if (t.includes('jpeg') || t.includes('jpg')) return 'jpg';
+  if (t.includes('mp4')) return 'mp4';
+  if (t.includes('webm')) return 'webm';
+  if (t.includes('quicktime')) return 'mov';
   if (t.includes('font') || t.includes('woff')) return 'woff2';
   if (t.startsWith('text/')) return 'txt';
   return 'bin';
@@ -95,6 +98,26 @@ async function putBlobNew(blob: Blob): Promise<string> {
 }
 
 async function putBlobRaw(blob: Blob): Promise<string> {
+  // 선택 설정: Cloudinary를 연결해 두면 이미지/GIF/동영상은 O.HOME 저장소 대신
+  // Cloudinary에 직접 올리고, O.HOME에는 반환된 URL만 저장한다.
+  // NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME / NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET 둘 다 있을 때만 사용.
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
+  const isMedia = blob.type.startsWith('image/') || blob.type.startsWith('video/');
+  if (cloudName && uploadPreset && isMedia) {
+    const form = new FormData();
+    form.append('file', blob);
+    form.append('upload_preset', uploadPreset);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/auto/upload`, {
+      method: 'POST', body: form,
+    });
+    const data = await res.json().catch(() => null) as { secure_url?: string; error?: { message?: string } } | null;
+    if (!res.ok || !data?.secure_url) {
+      throw new Error(data?.error?.message || `Cloudinary 업로드 실패 (${res.status})`);
+    }
+    return data.secure_url;
+  }
+
   const be = isServerMode() ? backend() : null;
   if (be) return be.uploadFile(blob, extOf(blob));   // 서버 모드 — 공개 URL 반환
   const id = newId();

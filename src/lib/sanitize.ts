@@ -10,7 +10,8 @@ export function sanitizeHtml(html: string): string {
   if (typeof window === 'undefined') return '';
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
-    ADD_ATTR: ['style', 'target', 'align'],   // 스타일 자유 (6.3)
+    ADD_TAGS: ['video'],
+    ADD_ATTR: ['style', 'target', 'align', 'src', 'controls', 'playsinline', 'preload'],   // 스타일 + 에디터 동영상
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input'],
   });
 }
