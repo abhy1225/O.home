@@ -2065,7 +2065,7 @@ function MenuPane() {
   // 멤버 선택 모달 (v2.0 사용자 요청) — 「비로그인 숨김」·갤러리 글쓰기를 특정 회원으로 좁힌다
   const [memAsk, setMemAsk] = useState<{ ids: string[]; apply: (ids: string[]) => void; desc?: string } | null>(null);
   const [commSet, patchComm] = useCommSettings();
-  const { boards, loaded: bLoaded, patchBoard } = useBoards();  // 추가 게시판 이름·자동 편입 동기화 + 권한
+  const { boards, setBoards, loaded: bLoaded, patchBoard } = useBoards();  // 추가 게시판 이름·자동 편입 동기화 + 권한
   const toast = useToast();
   const del = useConfirmDelete();
   const saved = ms.tree ?? defaultTree();
@@ -2078,6 +2078,8 @@ function MenuPane() {
   const [nlHref, setNlHref] = useState('');
   // 상위 메뉴 안에서 바로 만드는 커스텀 하위 메뉴
   const [subAdd, setSubAdd] = useState<{ gid: string; name: string; href: string } | null>(null);
+  // 상위 메뉴 안에서 독립 게시판을 바로 생성해 하위 메뉴로 배치
+  const [subBoardAdd, setSubBoardAdd] = useState<{ gid: string; name: string } | null>(null);
   const extraAll = [...boardEntries(boards), ...sectionMenuEntries(secMap), ...linkEntries(links)];
   const defLabel = (href: string) => menuLabelFor(href, extraAll) ?? href;
 
@@ -2552,7 +2554,9 @@ function MenuPane() {
                       </div>
                     </div>
                   )} />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 10.5 }}
+                    onClick={() => setSubBoardAdd({ gid: g.id, name: '' })}>＋ 하위 게시판 추가</button>
                   <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 10.5 }}
                     onClick={() => setSubAdd({ gid: g.id, name: '', href: '' })}>＋ 하위 메뉴 직접 추가</button>
                 </div>
@@ -2685,6 +2689,41 @@ function MenuPane() {
           <KInput value={subAdd?.href ?? ''} placeholder="/chars 또는 전체 URL"
             onChange={e => setSubAdd(v => v ? { ...v, href: e.target.value } : v)} />
           <p className="hint" style={{ margin: '2px 0 0' }}>내 홈페이지 페이지는 /로 시작하는 주소를, 외부 사이트는 https:// 전체 주소를 입력하면 됩니다.</p>
+        </div>
+      </Modal>
+
+      <Modal open={subBoardAdd !== null} small title="하위 게시판 추가"
+        desc="이 상위 메뉴 아래에 글이 서로 섞이지 않는 독립 게시판을 새로 만들고 바로 배치합니다. 주소는 자동으로 만들어집니다."
+        onClose={() => setSubBoardAdd(null)}
+        dirty={!!subBoardAdd?.name}
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setSubBoardAdd(null)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={() => {
+            if (!subBoardAdd) return;
+            const name = subBoardAdd.name.trim();
+            if (!name) { toast('게시판 이름을 입력해 주세요'); return; }
+            const id = newId();
+            const href = `/board?b=${id}`;
+            const board: Board = {
+              id, name, desc: `${name} 게시판`, skin: 'list',
+              permWrite: 'member', permComment: 'member',
+              cats: DEFAULT_BOARD_CATS.map(c => ({ ...c })),
+            };
+            setBoards([...boards, board]);
+            setTree(tree.map(g => g.id === subBoardAdd.gid
+              ? { ...g, items: [...g.items, { href, label: name }] }
+              : g));
+            setSubBoardAdd(null);
+            toast(`「${name}」 게시판을 만들었습니다 — SAVE를 눌러 메뉴에 적용해 주세요`);
+          }}>＋ CREATE</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <label className="k-label">게시판 이름</label>
+          <KInput value={subBoardAdd?.name ?? ''} placeholder="예: 라에른 × 로안"
+            onChange={e => setSubBoardAdd(v => v ? { ...v, name: e.target.value } : v)} />
+          <p className="hint" style={{ margin: '2px 0 0' }}>
+            같은 /board를 공유하지 않고 고유 게시판 ID가 자동 생성됩니다. 이 게시판에서 쓴 글은 다른 하위 게시판과 섞이지 않습니다.
+          </p>
         </div>
       </Modal>
 
