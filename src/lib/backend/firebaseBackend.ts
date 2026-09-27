@@ -243,6 +243,10 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
 
+    async adminResetPassword() {
+      return { ok: false, error: '관리자 비밀번호 초기화는 현재 Supabase 모드에서만 지원합니다.' };
+    },
+
     /** 첫 계정을 소유자(관리자)로 등록 — 규칙이 "없을 때 1회"만 허용한다 */
     async claimOwner() {
       const u = auth.currentUser;

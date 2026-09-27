@@ -179,6 +179,24 @@ export async function createSupabaseBackend(
       return error ? { ok: false, error: error.message } : { ok: true };
     },
 
+    async adminResetPassword(userId, newPassword) {
+      if (newPassword.length < 6) return { ok: false, error: '임시 비밀번호는 6자 이상 입력해 주세요.' };
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return { ok: false, error: '로그인이 필요합니다.' };
+      try {
+        const res = await fetch('/api/admin/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ userId, newPassword }),
+        });
+        const body = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+        return res.ok && body.ok ? { ok: true } : { ok: false, error: body.error ?? '비밀번호 초기화에 실패했습니다.' };
+      } catch {
+        return { ok: false, error: '비밀번호 초기화 서버에 연결하지 못했습니다.' };
+      }
+    },
+
     // Supabase는 스키마의 트리거가 첫 가입자를 관리자로 만들어 준다 — 추가 작업 없음
     async claimOwner() { return { ok: true }; },
 

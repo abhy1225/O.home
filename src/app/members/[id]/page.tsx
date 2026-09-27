@@ -18,7 +18,7 @@ import { CroppedBlobImg } from '@/components/ui/CropEditor';
 import { PageTitle } from '@/components/ui/PageText';
 import { getSetting } from '@/lib/settingStore';
 import { useMembers } from '@/lib/members';
-import { isServerMode } from '@/lib/backend';
+import { backend, isServerMode } from '@/lib/backend';
 import { Pager } from '@/components/ui/Kit';
 
 const PER = 15;
@@ -39,6 +39,9 @@ export default function MemberDetailPage() {
   const [member, setMember] = useState<User | null | undefined>(undefined); // undefined = 로딩
   const [tags, setTags] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [tempPassword, setTempPassword] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
   useEffect(() => {
     // 서버 모드에서는 가입 회원이 DB(profiles)에 있다 — 로컬 계정 목록에만 물으면 못 찾는다
     if (isServerMode()) {
@@ -60,6 +63,19 @@ export default function MemberDetailPage() {
     setTags(getSetting<Record<string, string[]>>('ohome.membertags.v1', {})[id] ?? []);
   }, [id, members]);
   const avatarSrc = useBlobUrl(member?.avatarUrl);
+
+  const resetMemberPassword = async () => {
+    if (!member || member.role === 'admin') return;
+    if (tempPassword.length < 6) { setResetMsg('임시 비밀번호는 6자 이상 입력해 주세요.'); return; }
+    if (!window.confirm(`${member.nickname} 회원의 비밀번호를 지금 입력한 임시 비밀번호로 초기화할까요?`)) return;
+    const be = backend();
+    if (!be) { setResetMsg('서버 연결을 확인해 주세요.'); return; }
+    setResetBusy(true); setResetMsg('');
+    const r = await be.adminResetPassword(member.id, tempPassword);
+    setResetBusy(false);
+    if (r.ok) { setResetMsg('비밀번호를 초기화했습니다. 회원에게 임시 비밀번호를 전달해 주세요.'); setTempPassword(''); }
+    else setResetMsg(r.error ?? '비밀번호 초기화에 실패했습니다.');
+  };
 
   if (member === undefined) return <section className="page" />;
   if (!isAdmin) {
@@ -113,6 +129,25 @@ export default function MemberDetailPage() {
             </div>
           </div>
         </div>
+
+        {isServerMode() && member.role !== 'admin' && (
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+            <h3 style={{ margin: 0 }}>비밀번호 초기화</h3>
+            <p className="hint" style={{ margin: '5px 0 9px' }}>회원이 비밀번호를 잊었을 때 임시 비밀번호를 지정합니다. 기존 비밀번호는 확인할 수 없습니다.</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                className="input" type="password" value={tempPassword}
+                onChange={e => setTempPassword(e.target.value)}
+                placeholder="임시 비밀번호 (6자 이상)" autoComplete="new-password"
+                style={{ minWidth: 220, flex: '1 1 220px' }}
+              />
+              <button className="btn" type="button" disabled={resetBusy || tempPassword.length < 6} onClick={resetMemberPassword}>
+                {resetBusy ? '초기화 중…' : '비밀번호 초기화'}
+              </button>
+            </div>
+            {resetMsg && <p className="hint" style={{ marginTop: 7 }}>{resetMsg}</p>}
+          </div>
+        )}
 
         {/* 연동된 캐릭터 (3차 회원-캐릭터 연결) */}
         <h3 style={{ marginTop: 20 }}>연동된 캐릭터</h3>
