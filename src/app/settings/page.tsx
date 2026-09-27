@@ -2076,6 +2076,8 @@ function MenuPane() {
   // 예전에는 ADD가 빈 행을 즉시 등록해, 주소를 치는 순간 미배치에 미완성 링크가 나타났다
   const [nlName, setNlName] = useState('');
   const [nlHref, setNlHref] = useState('');
+  // 상위 메뉴 안에서 바로 만드는 커스텀 하위 메뉴
+  const [subAdd, setSubAdd] = useState<{ gid: string; name: string; href: string } | null>(null);
   const extraAll = [...boardEntries(boards), ...sectionMenuEntries(secMap), ...linkEntries(links)];
   const defLabel = (href: string) => menuLabelFor(href, extraAll) ?? href;
 
@@ -2197,25 +2199,6 @@ function MenuPane() {
   const removeItem = (gid: string, href: string) => {
     setTree(tree.map(g => (g.id === gid ? { ...g, items: g.items.filter(i => i.href !== href) } : g)));
     markRemoved([href]);
-  };
-  // 단독 메뉴를 상위 카테고리로 전환 — 기존 페이지는 첫 하위 메뉴로 그대로 보존한다.
-  // 예: 「캐릭터 /chars」 → 「캐릭터」 > 「캐릭터 /chars」. 이후 미배치 기능을 같은 그룹에 추가 가능.
-  const makeGroupFromSolo = (g: MenuGroupNode) => {
-    if (!g.href) return;
-    const href = g.href;
-    const leaf: MenuLeaf = {
-      href,
-      label: g.label,
-      ...(g.pageTitle ? { pageTitle: g.pageTitle } : {}),
-    };
-    setTree(tree.map(x => (x.id === g.id
-      ? {
-          id: x.id, label: x.label, items: [leaf],
-          ...(x.vis ? { vis: x.vis } : {}),
-          ...(x.open ? { open: x.open } : {}),
-          ...(x.visMembers?.length ? { visMembers: x.visMembers } : {}),
-        }
-      : x)));
   };
   const moveItem = (fromGid: string, it: MenuLeaf, to: string) => {
     const stripped = tree.map(g => (g.id === fromGid ? { ...g, items: g.items.filter(i => i.href !== it.href) } : g));
@@ -2534,12 +2517,6 @@ function MenuPane() {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {g.href && extraFor(g.href)}
-                {g.href && (
-                  <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
-                    onClick={() => makeGroupFromSolo(g)} title="이 메뉴를 상위 카테고리로 바꾸고 하위 메뉴를 넣습니다">
-                    ＋ 하위
-                  </button>
-                )}
                 <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
                   onClick={() => askRemoveGroup(g)}>{g.href ? '빼기' : 'DELETE'}</button>
               </div>
@@ -2575,8 +2552,12 @@ function MenuPane() {
                       </div>
                     </div>
                   )} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 10.5 }}
+                    onClick={() => setSubAdd({ gid: g.id, name: '', href: '' })}>＋ 하위 메뉴 직접 추가</button>
+                </div>
                 {g.items.length === 0 && (
-                  <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>하위 메뉴가 없으면 상단 메뉴에 표시되지 않습니다 — 아래 「미배치 기능」에서 추가</small>
+                  <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>하위 메뉴가 없습니다 — 「하위 메뉴 직접 추가」로 새로 만들거나 아래 「미배치 기능」에서 기존 기능을 넣을 수 있습니다</small>
                 )}
               </div>
             )}
@@ -2673,6 +2654,40 @@ function MenuPane() {
       )}
 
       {del.element}
+
+      <Modal open={subAdd !== null} small title="하위 메뉴 직접 추가"
+        desc="미배치 목록을 거치지 않고 이 상위 메뉴에 바로 추가합니다. 사이트 안 주소(/...)나 다른 사이트 전체 주소를 사용할 수 있습니다."
+        onClose={() => setSubAdd(null)}
+        dirty={!!subAdd?.name || !!subAdd?.href}
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setSubAdd(null)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={() => {
+            if (!subAdd) return;
+            const name = subAdd.name.trim();
+            const href = toInternalPath(subAdd.href);
+            if (!name) { toast('하위 메뉴 이름을 입력해 주세요'); return; }
+            if (!href || href === '/') { toast('이동할 주소를 입력해 주세요'); return; }
+            if (placedSet.has(href) || links.some(l => l.href === href)) { toast('이미 등록된 주소입니다'); return; }
+            const id = newId();
+            setLinks([...links, { id, name, href }]);
+            setTree(tree.map(g => g.id === subAdd.gid
+              ? { ...g, items: [...g.items, { href, label: name }] }
+              : g));
+            setSubAdd(null);
+            toast('하위 메뉴를 추가했습니다 — SAVE를 눌러 적용해 주세요');
+          }}>＋ ADD</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <label className="k-label">하위 메뉴 이름</label>
+          <KInput value={subAdd?.name ?? ''} placeholder="예: 마비노기 캐릭터"
+            onChange={e => setSubAdd(v => v ? { ...v, name: e.target.value } : v)} />
+          <label className="k-label">이동할 주소</label>
+          <KInput value={subAdd?.href ?? ''} placeholder="/chars 또는 전체 URL"
+            onChange={e => setSubAdd(v => v ? { ...v, href: e.target.value } : v)} />
+          <p className="hint" style={{ margin: '2px 0 0' }}>내 홈페이지 페이지는 /로 시작하는 주소를, 외부 사이트는 https:// 전체 주소를 입력하면 됩니다.</p>
+        </div>
+      </Modal>
+
       {/* 기본 구성 리셋 확인 (v1.9) — 드래프트만 교체, SAVE로 확정 */}
       <ConfirmModal open={resetAsk} title="메뉴를 기본 구성으로 되돌리시겠습니까?"
         body="기본 제공 메뉴 구성(자놀·게시판·TRPG·커미션·기록·방명록)으로 편집 화면이 바뀝니다. SAVE를 눌러야 실제 메뉴에 반영됩니다."
