@@ -113,7 +113,10 @@ export async function createSupabaseBackend(
     async signOut() { await sb.auth.signOut(); },
 
     async resetPassword(email) {
-      const { error } = await sb.auth.resetPasswordForEmail(email);
+      // Site URL 설정이 비어 있거나 잘못되어 있어도 null/localhost로 가지 않도록
+      // 현재 O.HOME 주소의 전용 비밀번호 재설정 화면을 명시한다.
+      const redirectTo = `${window.location.origin}/password-reset`;
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
       return error ? { ok: false, error: error.message } : { ok: true };
     },
 
@@ -150,6 +153,20 @@ export async function createSupabaseBackend(
       const fallbackNickname =
         (data.user.user_metadata?.nickname as string | undefined)?.trim() ||
         profile?.nickname || data.user.email?.split('@')[0] || 'user';
+
+      // 비밀번호 변경. 마이페이지에서는 현재 비밀번호를 먼저 재인증하고,
+      // 복구 메일로 들어온 PASSWORD_RECOVERY 세션에서는 currentPassword 없이 변경한다.
+      if (patch.newPassword) {
+        if (patch.newPassword.length < 6) return { ok: false, error: '새 비밀번호는 6자 이상 입력해 주세요.' };
+        if (patch.currentPassword) {
+          const email = data.user.email;
+          if (!email) return { ok: false, error: '계정 이메일을 확인할 수 없습니다.' };
+          const { error: verifyError } = await sb.auth.signInWithPassword({ email, password: patch.currentPassword });
+          if (verifyError) return { ok: false, error: '현재 비밀번호가 올바르지 않습니다.' };
+        }
+        const { error: passwordError } = await sb.auth.updateUser({ password: patch.newPassword });
+        if (passwordError) return { ok: false, error: passwordError.message };
+      }
 
       const row: Record<string, unknown> = {
         id: data.user.id,
