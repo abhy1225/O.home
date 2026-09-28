@@ -51,7 +51,7 @@ function CharEditInner() {
       ? charWithAu(ch, auKey)
       : {
         ...ch, name: '', sub: '', basicHtml: '', tabs: [], colors: [], colorTipMode: 'hex' as const,
-        specs: [{ label: '성별', value: '' }, { label: '키', value: '' }],
+        specs: [{ label: '나이', value: '' }, { label: '성별', value: '' }, { label: '키', value: '' }, { label: '몸무게', value: '' }, { label: '생일', value: '' }],
         arts: [], artId: undefined, thumbId: undefined, thumbCrop: undefined,
       })
     : ch;

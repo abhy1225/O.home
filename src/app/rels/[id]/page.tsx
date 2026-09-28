@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 자관 상세 (4.5) — 2인: 헤더 블러 + 대형 타이틀 + 좌우 카드 + 중앙 일러(전신/일러 토글) + AU
 // 하단: TIMELINE / QUESTIONS 탭 (v1.8) + 역극·로그 연동 리스트 · 다인(3인+): 멤버 리스트형
 // 관리자: 멤버 추가(내/상대 캐릭터) · 타임라인 항목 추가 · 질문 추가
@@ -517,7 +517,7 @@ export default function RelDetailPage() {
         // 입력한 색은 대표 테마색(color)으로만 쓴다 — 예전엔 팔레트(colors)에도 「테마색」이라는
         // 이름으로 한 칸 자동 등록해서, 포인트 컬러로 넣은 값이 팔레트에 멋대로 들어가 있었다
         // (v2.0 사용자 요청). 팔레트는 캐릭터 수정에서 직접 넣는다
-        colors: [], specs: [], tabs: [],
+        colors: [], specs: [{ label: '나이', value: '' }, { label: '성별', value: '' }, { label: '키', value: '' }, { label: '몸무게', value: '' }, { label: '생일', value: '' }], tabs: [],
         basicHtml: '', visibility: 'public', thumbClass: '', own: false,
         grants: mGrants.length ? mGrants : undefined, // 회원 권한 — 역극 플레이/편집 (v1.9)
       };
