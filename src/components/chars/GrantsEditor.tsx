@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 회원-캐릭터 권한 편집 (3차, v1.9) — 상대 캐릭터에 회원별 권한 부여:
 // 역극 플레이(그 캐릭터로 발화 가능) / 편집까지(캐릭터 편집 포함).
 // v1.9 개편: 회원 전체 나열 대신 닉네임·아이디 검색으로 추가하고, 권한이 있는 회원만 목록에 표시.
@@ -21,6 +21,7 @@ export function GrantsEditor({ value, onChange }: {
   const [q, setQ] = useState('');
   // 드롭다운은 body 포털(fixed) — 카드 overflow에 잘리지 않고, 아래 공간이 없으면 위로 (v1.9 수정)
   const wrapRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
   // 위로 띄울 때는 top을 계산하지 않고 bottom으로 고정한다 (v2.0 사용자 지적).
   // 예전엔 "입력칸 위 192px"이라는 고정 추정값에 top을 맞춰서, 결과가 한두 개뿐이면
   // 목록이 입력칸에서 멀찍이 떨어진 채 위쪽부터 쌓인 것처럼 보였다.
@@ -40,10 +41,30 @@ export function GrantsEditor({ value, onChange }: {
   const setOpen = (v: boolean) => (v ? openAt() : setPos(null));
   useEffect(() => {
     if (!open) return;
-    const close = () => setPos(null);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+
+    // 검색 결과 자체를 스크롤할 때는 닫지 않는다.
+    // window의 capture scroll listener는 자식 요소의 스크롤까지 받기 때문에
+    // 예전에는 목록을 휠/스크롤바로 내리는 순간 드롭다운이 사라졌다.
+    const onScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && popRef.current?.contains(target)) return;
+      setPos(null);
+    };
+    const onResize = () => setPos(null);
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && (wrapRef.current?.contains(target) || popRef.current?.contains(target))) return;
+      setPos(null);
+    };
+
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onResize);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onResize);
+      document.removeEventListener('pointerdown', onPointerDown, true);
+    };
   }, [open]);
 
   const granted = value
@@ -64,10 +85,9 @@ export function GrantsEditor({ value, onChange }: {
       <div ref={wrapRef} style={{ position: 'relative' }}>
         <KInput placeholder="닉네임·아이디 검색" value={q}
           onChange={e => { setQ(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)} />
+          onFocus={() => setOpen(true)} />
         {open && matches.length > 0 && typeof document !== 'undefined' && createPortal(
-          <div style={{
+          <div ref={popRef} style={{
             position: 'fixed', left: pos!.left, width: pos!.width, zIndex: 120,
             ...(pos!.bottom !== undefined ? { bottom: pos!.bottom } : { top: pos!.top }),
             background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 10,
