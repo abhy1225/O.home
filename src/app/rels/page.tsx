@@ -61,12 +61,11 @@ export default function RelsPage() {
                 {/* 리스트에서는 기본 폰트로 통일 — 개별 이름 폰트는 상세에서만 */}
                 <b>
                   {r.name}
-                  {r.visibility === 'member' && <span className="pill" style={{ marginLeft: 6 }}>멤버</span>}
                 </b>
                 <span>
                   {priv ? '관리자에게만 표시됨'
                     : memberLocked ? '로그인 시 열람 가능'
-                    : `${r.catchphrase.replace(/ /g, '')} · ${r.members.length}인`}
+                    : `${r.catchphrase.trim()} · ${r.members.length}인`}
                 </span>
                 {r.members.length > 0 && (
                   <div className="who">
