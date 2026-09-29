@@ -67,6 +67,7 @@ export interface Post {
   authorId: string;
   date: string;          // ISO
   secret: boolean;       // 비밀글
+  allowedViewerIds?: string[]; // 비밀글 추가 열람 허용 회원
   notice: boolean;       // 공지 고정
   fold: { type: FoldType; label?: string } | null; // 스포일러/수위 접기 (6.2)
   comments: Comment[];

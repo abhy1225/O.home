@@ -18,6 +18,7 @@ import { CropEditor, CropValue } from '@/components/ui/CropEditor';
 import { putBlob, useBlobUrl } from '@/lib/blobStore';
 import { useToast } from '@/components/ui/Toast';
 import { EditableDesc, PageTitle } from '@/components/ui/PageText';
+import { ViewerPicker } from '@/components/ui/ViewerPicker';
 
 interface UpFile {
   id: string; name: string; size?: number;
@@ -93,6 +94,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
   }, [galleryCats.length]);
   const [madeDate, setMadeDate] = useState(initial?.madeDate ?? '');
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
+  const [allowedViewerIds, setAllowedViewerIds] = useState<string[]>(initial?.allowedViewerIds ?? []);
   const [foldType, setFoldType] = useState<FoldType | 'none'>(initial?.fold?.type ?? 'none');
   const [foldLabel, setFoldLabel] = useState(initial?.fold?.label ?? '');
   const [cropFor, setCropFor] = useState<UpFile | null>(null);
@@ -151,7 +153,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
         thumbCrop: files[0]?.crop, // 대표 이미지 크롭 (6.1)
         desc, category, tags: parseTags(tagsText), madeDate: madeDate || undefined,
         date: new Date().toISOString(), author: user.nickname, authorId: user.id,
-        visibility,
+        visibility, allowedViewerIds: visibility === 'private' ? allowedViewerIds : [],
         fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
       };
       setPosts([{ ...p, ...secStamp(sec.id) }, ...posts]);
@@ -163,6 +165,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
         images: imageIds, phList: files.length ? [] : x.phList,
         thumbCrop: files[0]?.crop,
         desc, category, tags: parseTags(tagsText), madeDate: madeDate || undefined, visibility,
+        allowedViewerIds: visibility === 'private' ? allowedViewerIds : [],
         fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
       } : x));
       toast('저장되었습니다');
@@ -277,6 +280,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
                   { value: 'member', label: '멤버공개' },
                   { value: 'private', label: '나만보기' },
                 ]} />
+              {visibility === 'private' && <div style={{ marginTop: 8, width: '100%' }}><ViewerPicker value={allowedViewerIds} onChange={setAllowedViewerIds} /></div>}
             </div>
           </div>
           <div className="panel widget" style={{ marginBottom: 14 }}>

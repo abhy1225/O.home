@@ -35,7 +35,7 @@ export default function BackupDetailPage() {
   const tt = useSectionTitle('gallery', p?.secId, 'GALLERY');
   if (blocked) return blocked;
   if (!loaded) return <section className="page" />;
-  if (!p || (p.visibility === 'private' && !isAdmin) || (p.visibility === 'member' && !user)) {
+  if (!p || (p.visibility === 'private' && !isAdmin && !(!!user?.id && (p.allowedViewerIds ?? []).includes(user.id))) || (p.visibility === 'member' && !user)) {
     return (
       <section className="page">
         <div className="page-head"><PageTitle href={tt.href}>{tt.title}</PageTitle><p>게시물을 찾을 수 없거나 열람 권한이 없습니다</p></div>

@@ -149,6 +149,11 @@ begin
         or (visibility = 'member' and auth.uid() is not null)
         or author_id = auth.uid()
         or public.is_admin()
+        or (
+          auth.uid() is not null
+          and jsonb_typeof(coalesce(data->'allowedViewerIds', '[]'::jsonb)) = 'array'
+          and (data->'allowedViewerIds') ? auth.uid()::text
+        )
       )$p$, t);
 
     -- 쓰기: 로그인 회원 (방명록만 아래에서 비로그인 허용으로 덮어씀)

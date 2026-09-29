@@ -24,7 +24,7 @@ export default function RelsPage() {
 
   const colorOf = (id: string) => chars.find(c => c.id === id)?.color ?? '#666';
   const visible = rels
-    .filter(r => isAdmin || r.visibility !== 'private')
+    .filter(r => isAdmin || r.visibility !== 'private' || (!!user?.id && (r.allowedViewerIds ?? []).includes(user.id)))
     .filter(r => !q || r.name.toLowerCase().includes(q.toLowerCase()));
 
   // 편집모드 카드 드래그 정렬 (v1.9)

@@ -37,6 +37,16 @@ const EditorFont = Mark.create({
   },
 });
 
+
+const EditorFontSize = Mark.create({
+  name: 'editorFontSize',
+  addAttributes() { return { size: { default: null, parseHTML: el => (el as HTMLElement).style.fontSize || null,
+    renderHTML: attrs => attrs.size ? { style: `font-size:${attrs.size}` } : {} } }; },
+  parseHTML() { return [{ tag: 'span[style*="font-size"]' }]; },
+  renderHTML({ HTMLAttributes }) { return ['span', mergeAttributes(HTMLAttributes), 0]; },
+});
+const FONT_SIZE_OPTIONS = Array.from({ length: 8 }, (_, i) => `${i + 8}pt`);
+
 const Video = Node.create({
   name: 'video',
   group: 'block',
@@ -114,7 +124,7 @@ export function RichEditor({ value, onChange, placeholder }: {
   const [urlOpen, setUrlOpen] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const editor = useEditor({
-    extensions: [StarterKit, Image, Video, ParagraphFormat, EditorFont],
+    extensions: [StarterKit, Image, Video, ParagraphFormat, EditorFont, EditorFontSize],
     content: value || '<p></p>',
     immediatelyRender: false,
     editorProps: {
@@ -135,6 +145,12 @@ export function RichEditor({ value, onChange, placeholder }: {
   const currentLineHeight = editor?.getAttributes('paragraph').lineHeight
     || editor?.getAttributes('heading').lineHeight || '';
   const currentFontFamily = editor?.getAttributes('editorFont').family || '';
+  const currentFontSize = editor?.getAttributes('editorFontSize').size || '';
+  const setEditorFontSize = (size: string) => {
+    if (!editor) return;
+    if (!size) editor.chain().focus().unsetMark('editorFontSize').run();
+    else editor.chain().focus().setMark('editorFontSize', { size }).run();
+  };
 
   const setEditorFont = (fontId: string) => {
     if (!editor) return;
@@ -202,6 +218,11 @@ export function RichEditor({ value, onChange, placeholder }: {
           {fonts.map(f => (
             <option key={f.id} value={f.id}>{f.name}</option>
           ))}
+        </select>
+        <select className="re-select" title="글자 크기" aria-label="글자 크기" value={currentFontSize}
+          onMouseDown={e => e.stopPropagation()} onChange={e => setEditorFontSize(e.target.value)} style={{ width: 76 }}>
+          <option value="">기본 크기</option>
+          {FONT_SIZE_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
         <span className="re-sep" />
         <TBtn title="굵게" label={<b>B</b>} on={editor.isActive('bold')}

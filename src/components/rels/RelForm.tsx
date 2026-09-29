@@ -17,6 +17,7 @@ import { Lightbox } from '@/components/ui/Lightbox';
 import { useConfirmDelete } from '@/components/ui/Modal';
 import { fileDrop } from '@/lib/dnd';
 import { useToast } from '@/components/ui/Toast';
+import { ViewerPicker } from '@/components/ui/ViewerPicker';
 
 export interface RelFormValue {
   slug?: string;             // 페이지 주소 /rels/{slug} (v1.9 — 신규 등록 시, 비우면 자동 id)
@@ -24,6 +25,7 @@ export interface RelFormValue {
   catchphrase: string;
   kind: 'pair' | 'multi';
   visibility: Visibility;
+  allowedViewerIds?: string[];
   fontId: string;
   bodyFontId: string;
   arts: string[];            // 첫 장 = 대표 = 리스트 썸네일 원본
@@ -176,6 +178,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   const [slug, setSlug] = useState(initial?.slug ?? '');
   const [catchphrase, setCatchphrase] = useState(auObj ? auObj.catchphrase : (initial?.catchphrase ?? ''));
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
+  const [allowedViewerIds, setAllowedViewerIds] = useState<string[]>(initial?.allowedViewerIds ?? []);
   const [cp, setCp] = useState<RelCpTag>(initial?.cp ?? 'cp');   // CP/NCP (v1.9)
   // AU 편집이면 그 AU에 정한 폰트부터 (v2.0 사용자 제보 — AU 폰트가 분리되지 않던 것)
   const [fontId, setFontId] = useState((auObj?.fontId ?? initial?.fontId) ?? 'serif');
@@ -313,7 +316,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
       slug: slug.trim() || undefined,
       name: name.trim().toUpperCase(),
       catchphrase: catchphrase.trim(),
-      kind, visibility, fontId, bodyFontId,
+      kind, visibility, allowedViewerIds: visibility === 'private' ? allowedViewerIds : [], fontId, bodyFontId,
       arts: artIds,
       thumbCrop,
       headerImgId: headerFile ? await putBlob(headerFile) : (headerRemoved ? undefined : initHeaderId),
@@ -827,6 +830,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 { value: 'member', label: '멤버공개' },
                 { value: 'private', label: '나만보기' },
               ]} />
+            {visibility === 'private' && <ViewerPicker value={allowedViewerIds} onChange={setAllowedViewerIds} />}
           </div>
         </div>
         <div className="form-actions">

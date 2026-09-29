@@ -165,7 +165,7 @@ export function metaOf(item: ListItem, uid: string | null, floor = 'public') {
   const hasListHidden = typeof item.listHidden === 'boolean';
   const own = hasListHidden
     ? (item.listHidden ? 'private' : 'public')
-    : (typeof item.visibility === 'string' ? item.visibility : 'public');
+    : (item.secret === true ? 'private' : (typeof item.visibility === 'string' ? item.visibility : 'public'));
   /* 메뉴를 비공개로 둔 곳의 글은 그 기준까지 좁혀 저장한다 (v2.0 사용자 요청 — visFloor 참조).
      **좁히기만 한다** — 글이 이미 더 좁으면 그대로다. 게시판 글처럼 visibility 칸이 아예 없는
      종류도 여기서 정해지므로, 서버가 내주지 않는 것은 화면과 무관하게 보장된다. */

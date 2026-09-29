@@ -489,7 +489,7 @@ export default function RelDetailPage() {
     [rooms, rel, user]);
 
   if (!loaded) return <section className="page" />;
-  if (!rel || (rel.visibility === 'private' && !isAdmin) || (rel.visibility === 'member' && !user)) {
+  if (!rel || (rel.visibility === 'private' && !isAdmin && !(!!user?.id && (rel.allowedViewerIds ?? []).includes(user.id))) || (rel.visibility === 'member' && !user)) {
     return (
       <section className="page">
         <div className="page-head"><PageTitle>RELATIONS</PageTitle><p>자관을 찾을 수 없거나 열람 권한이 없습니다</p></div>

@@ -388,6 +388,7 @@ export interface Relation {
   thumbCrop?: import("@/components/ui/CropEditor").CropValue;
   members: RelMember[];          // 2인 = 좌/우, 3인+ = 다인 리스트
   visibility: Visibility;
+  allowedViewerIds?: string[]; // 나만보기에서 추가 열람 허용 회원
   thumbClass: string;
   illustMode: 'duo' | 'one';     // 2인: 전신 2장 / 일러 1장 (v1.8)
   aus: RelAu[];                  // AU 리스트 (첫 항목 = 원본 base)

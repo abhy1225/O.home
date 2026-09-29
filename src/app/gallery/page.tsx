@@ -55,7 +55,7 @@ function BackupPageInner() {
   };
 
   const visible = posts
-    .filter(p => isAdmin || p.visibility === 'public' || (p.visibility === 'member' && user))
+    .filter(p => isAdmin || p.visibility === 'public' || (p.visibility === 'member' && user) || (p.visibility === 'private' && !!user?.id && (p.allowedViewerIds ?? []).includes(user.id)))
     .filter(p => !q || p.title.includes(q) || p.category.includes(q)
       || (p.tags ?? []).some(t => t.toLowerCase().includes(q.toLowerCase())));   // 태그 검색 (v2.0)
 

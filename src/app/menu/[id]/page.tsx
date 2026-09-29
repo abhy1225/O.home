@@ -86,7 +86,7 @@ export default function MenuLandingPage() {
               {bid && (
                 <div style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
                   {boardPosts.length ? boardPosts.map(p => {
-                    const canRead = !p.secret || isAdmin || (!!p.authorId && p.authorId === user?.id);
+                    const canRead = !p.secret || isAdmin || (!!p.authorId && p.authorId === user?.id) || (!!user?.id && (p.allowedViewerIds ?? []).includes(user.id));
                     return (
                       <button
                         key={p.id}

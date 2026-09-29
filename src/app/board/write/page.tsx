@@ -13,6 +13,7 @@ import { ConfirmModal } from '@/components/ui/Modal';
 import { RichEditor } from '@/components/ui/RichEditor';
 import { useToast } from '@/components/ui/Toast';
 import { PageTitle, EditableDesc } from '@/components/ui/PageText';
+import { ViewerPicker } from '@/components/ui/ViewerPicker';
 
 /** 에디터가 다루지 못해 정리될 만한 태그·속성이 있는가 — 전환 경고 판단 (인트로와 같은 기준) */
 const hasRichHtml = (html: string) =>
@@ -41,6 +42,7 @@ function WriteInner() {
   React.useEffect(() => { if (!category && board.cats[0]) setCategory(board.cats[0].label); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board.cats.length]);
   const [secret, setSecret] = useState(false);
+  const [allowedViewerIds, setAllowedViewerIds] = useState<string[]>([]);
   const [notice, setNotice] = useState(false);
   // 태그 (v2.0 사용자 요청) — 쉼표로 구분해 입력, 저장할 때 배열로
   const [tagsText, setTagsText] = useState('');
@@ -76,7 +78,7 @@ function WriteInner() {
     // 에디터로 쓴 글을 수정하면 갑자기 태그가 보였다 (authored 없는 옛 글은 지금까지대로 HTML)
     setWriteMode(p.mode === 'md' ? 'md' : (p.authored === 'editor' ? 'editor' : 'html'));
     setCategory(p.category);
-    setSecret(p.secret); setNotice(p.notice);
+    setSecret(p.secret); setAllowedViewerIds(p.allowedViewerIds ?? []); setNotice(p.notice);
     setFoldType(p.fold?.type ?? 'none'); setFoldLabel(p.fold?.label ?? '');
     setTagsText((p.tags ?? []).join(', '));
     setThumbSrc(p.thumbSrc); setThumbCrop(p.thumbCrop);
@@ -104,7 +106,7 @@ function WriteInner() {
         mode: writeMode === 'md' ? 'md' : 'html',
         authored: writeMode === 'editor' ? 'editor' : undefined,
         category,
-        secret, notice: isAdmin ? notice : p.notice,
+        secret, allowedViewerIds: secret ? allowedViewerIds : [], notice: isAdmin ? notice : p.notice,
         tags: parseTags(tagsText),
         fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
         thumbSrc, thumbCrop,
@@ -117,7 +119,7 @@ function WriteInner() {
       id: newId(), title: title.trim(), body,
       mode: writeMode === 'md' ? 'md' : 'html', category,
       author: user.nickname, authorId: user.id, date: new Date().toISOString(),
-      secret, notice: isAdmin && notice,
+      secret, allowedViewerIds: secret ? allowedViewerIds : [], notice: isAdmin && notice,
       tags: parseTags(tagsText),
       fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
       comments: [],
@@ -222,7 +224,8 @@ function WriteInner() {
                 placeholder="쉼표로 구분" style={{ flex: 1 }} />
             </div>
             <div style={{ display: 'grid', gap: 9 }}>
-              <KCheck label="비밀글 (관리자와 나만 열람)" checked={secret} onChange={setSecret} />
+              <KCheck label="비밀글 (작성자·관리자만 + 지정 회원)" checked={secret} onChange={setSecret} />
+              {secret && <ViewerPicker value={allowedViewerIds} onChange={setAllowedViewerIds} />}
               {isAdmin && <KCheck label="공지로 고정" checked={notice} onChange={setNotice} />}
             </div>
           </div>

@@ -58,7 +58,8 @@ export default function BoardDetailPage() {
   /* 글쓴이인지 한 곳에서 정한다 (v2.0 발견) — 예전 글이나 손님이 쓴 글은 authorId가 없고
      비로그인 방문자도 user?.id가 없어, 서로 「같다」고 판정돼 **비밀글이 그대로 열렸다.** */
   const isAuthor = !!post.authorId && post.authorId === user?.id;
-  if (post.secret && !isAdmin && !isAuthor) {
+  const isAllowedViewer = !!user?.id && (post.allowedViewerIds ?? []).includes(user.id);
+  if (post.secret && !isAdmin && !isAuthor && !isAllowedViewer) {
     return (
       <section className="page">
         <div className="page-head"><PageTitle>BOARD</PageTitle><p>비밀글 — 작성자와 관리자만 열람할 수 있습니다</p></div>
