@@ -152,7 +152,38 @@ export function useLocalList<T extends { id?: string }>(key: string, seed: T[]):
     setList(next);            // 낙관적 반영 — 화면은 즉시 바뀐다
     latest.current = next;
     if (server) {
+      // 저장 전 데이터에서 사라진 Supabase Storage 파일 후보를 기억해 둔다.
+      // DB 저장이 성공한 뒤에만 전체 참조를 다시 검사해서, 정말 아무 데서도 안 쓰는 파일만 삭제한다.
+      // (Cloudinary/Imgur URL은 건드리지 않는다.)
+      const refs = (v: unknown, out = new Set<string>()): Set<string> => {
+        if (typeof v === 'string') {
+          if (v.includes('/storage/v1/object/public/ohome/')) out.add(v);
+        } else if (Array.isArray(v)) v.forEach(x => refs(x, out));
+        else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach(x => refs(x, out));
+        return out;
+      };
+      const beforeRefs = refs(prev);
+      const afterRefs = refs(next);
+      const removedRefs = [...beforeRefs].filter(ref => !afterRefs.has(ref));
+
       syncList(table, prev as unknown as { id: string }[], next as unknown as { id: string }[], currentUserId())
+        .then(async () => {
+          if (!removedRefs.length) return;
+          try {
+            const [{ backend }, { findOrphanFiles }] = await Promise.all([
+              import('./backend'), import('./transfer'),
+            ]);
+            const be = backend();
+            if (!be) return;
+            // 다른 게시글·캐릭터·자관·설정·회원 프로필에서 같은 파일을 쓰는지까지 전부 확인한다.
+            // 한 컬렉션이라도 읽기 실패하면 findOrphanFiles가 중단하므로 자동 삭제도 일어나지 않는다.
+            const orphanSet = new Set((await findOrphanFiles(be)).map(f => f.ref));
+            for (const ref of removedRefs) {
+              if (!orphanSet.has(ref)) continue;
+              try { await be.deleteFile(ref); } catch { /* 자동 정리는 실패해도 저장 자체는 유지 */ }
+            }
+          } catch { /* 안전 검사 실패 시 삭제하지 않는다 */ }
+        })
         .catch(err => {
           // 실패하면 서버 상태로 되돌려 화면과 DB가 어긋난 채로 남지 않게 —
           // 되돌리기만 하면 "방금 쓴 게 스스로 사라지는" 것처럼 보이므로 이유도 함께 알린다 (v2.0)
