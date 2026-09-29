@@ -76,7 +76,7 @@ function WriteInner() {
     setTitle(p.title); setBody(p.body);
     // 에디터로 쓴 글은 에디터로 다시 연다 — 예전에는 무조건 HTML 소스가 떠서
     // 에디터로 쓴 글을 수정하면 갑자기 태그가 보였다 (authored 없는 옛 글은 지금까지대로 HTML)
-    setWriteMode(p.mode === 'md' ? 'md' : (p.authored === 'editor' ? 'editor' : 'html'));
+    setWriteMode(p.mode === 'md' ? 'md' : (p.authored === 'html' ? 'html' : 'editor'));
     setCategory(p.category);
     setSecret(p.secret); setAllowedViewerIds(p.allowedViewerIds ?? []); setNotice(p.notice);
     setFoldType(p.fold?.type ?? 'none'); setFoldLabel(p.fold?.label ?? '');
@@ -104,7 +104,7 @@ function WriteInner() {
         ...p,
         title: title.trim(), body,
         mode: writeMode === 'md' ? 'md' : 'html',
-        authored: writeMode === 'editor' ? 'editor' : undefined,
+        authored: writeMode === 'editor' ? 'editor' : (writeMode === 'html' ? 'html' : undefined),
         category,
         secret, allowedViewerIds: secret ? allowedViewerIds : [], notice: isAdmin ? notice : p.notice,
         tags: parseTags(tagsText),
@@ -117,7 +117,9 @@ function WriteInner() {
     }
     const p: Post = {
       id: newId(), title: title.trim(), body,
-      mode: writeMode === 'md' ? 'md' : 'html', category,
+      mode: writeMode === 'md' ? 'md' : 'html',
+      authored: writeMode === 'editor' ? 'editor' : (writeMode === 'html' ? 'html' : undefined),
+      category,
       author: user.nickname, authorId: user.id, date: new Date().toISOString(),
       secret, allowedViewerIds: secret ? allowedViewerIds : [], notice: isAdmin && notice,
       tags: parseTags(tagsText),
