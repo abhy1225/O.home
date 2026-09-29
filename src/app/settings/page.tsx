@@ -1591,6 +1591,33 @@ function CursorPane() {
   );
 }
 
+/** 고아 파일 미리보기 — 실제 삭제 전에 파일명/크기/이미지를 눈으로 확인한다. */
+function OrphanFileRow({ file }: { file: { ref: string; size: number } }) {
+  const url = useBlobUrl(file.ref);
+  const name = (() => {
+    try {
+      const raw = file.ref.split('?')[0];
+      return decodeURIComponent(raw.slice(raw.lastIndexOf('/') + 1)) || file.ref;
+    } catch { return file.ref; }
+  })();
+  const size = file.size >= 1048576
+    ? `${(file.size / 1048576).toFixed(1)} MB`
+    : `${Math.max(0.1, file.size / 1024).toFixed(1)} KB`;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '72px minmax(0,1fr) auto', gap: 12, alignItems: 'center', border: '1px solid var(--line)', borderRadius: 12, padding: 9 }}>
+      <div style={{ width: 72, height: 58, borderRadius: 9, overflow: 'hidden', background: 'var(--soft)', display: 'grid', placeItems: 'center' }}>
+        {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={e => { e.currentTarget.style.display = 'none'; }} /> : <span className="hint">FILE</span>}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <b style={{ display: 'block', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name}</b>
+        <small className="hint" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.ref}>{file.ref}</small>
+      </div>
+      <span className="hint" style={{ whiteSpace: 'nowrap' }}>{size}</span>
+    </div>
+  );
+}
+
 /** 데이터 백업 탭 (5.2) — 백업(데이터만/회원까지) · 복원 · 선택 초기화 (v1.9 사용자 확정) */
 function DataPane() {
   const toast = useToast();
@@ -1611,6 +1638,7 @@ function DataPane() {
   const [orphans, setOrphans] = useState<{ ref: string; size: number }[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [cleanAsk, setCleanAsk] = useState(false);
+  const [orphanPreviewOpen, setOrphanPreviewOpen] = useState(false);
   const orphanMB = (orphans ?? []).reduce((s, f) => s + f.size, 0) / 1048576;
 
   const scanOrphans = async () => {
@@ -1797,10 +1825,12 @@ function DataPane() {
             )}
             <button className="btn btn-ghost" style={{ padding: '9px 18px', opacity: scanning ? 0.5 : 1 }}
               disabled={scanning} onClick={scanOrphans}>{scanning ? '확인 중…' : '찾아보기'}</button>
-            {orphans && orphans.length > 0 && (
+            {orphans && orphans.length > 0 && (<>
+              <button className="btn btn-ghost" style={{ padding: '9px 18px' }}
+                onClick={() => setOrphanPreviewOpen(true)}>삭제 대상 확인</button>
               <button className="btn btn-accent" style={{ padding: '9px 18px', opacity: scanning ? 0.5 : 1 }}
                 disabled={scanning} onClick={() => setCleanAsk(true)}>{orphans.length}개 지우기</button>
-            )}
+            </>)}
           </div>
         </div>
       )}
@@ -1958,6 +1988,15 @@ function DataPane() {
                 <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>{g.desc}</small>
               </span>} />
           ))}
+        </div>
+      </Modal>
+
+      <Modal open={orphanPreviewOpen} title="삭제 대상 확인"
+        desc={`현재 어디에서도 참조하지 않는 파일 ${orphans?.length ?? 0}개 · ${orphanMB.toFixed(1)}MB — 여기서는 확인만 하며 삭제되지 않습니다.`}
+        onClose={() => setOrphanPreviewOpen(false)}
+        actions={<button className="btn btn-ghost" onClick={() => setOrphanPreviewOpen(false)}>닫기</button>}>
+        <div style={{ maxHeight: '60vh', overflowY: 'auto', display: 'grid', gap: 8, paddingRight: 4 }}>
+          {(orphans ?? []).map((f, i) => <OrphanFileRow key={`${f.ref}-${i}`} file={f} />)}
         </div>
       </Modal>
 
