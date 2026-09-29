@@ -466,7 +466,7 @@ function ContainImg({ fileRef, rounded, onActivate }: {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img ref={imgRef} src={url} alt="" draggable={false}
+      <img ref={imgRef} src={url} alt="" draggable={false} loading="lazy" decoding="async"
         onClick={e => { if (onActivate && hitTest(e)) onActivate(); }}
         style={{
           maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', display: 'block',
