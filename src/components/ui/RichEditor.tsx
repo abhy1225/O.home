@@ -123,6 +123,9 @@ export function RichEditor({ value, onChange, placeholder }: {
   const [busy, setBusy] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
+  // TipTap의 editor.isEmpty는 React 렌더를 직접 갱신하지 않아, 입력 후에도
+  // 플레이스홀더가 화면에 남는 경우가 있다. 빈 상태를 React state로 동기화한다.
+  const [isEditorEmpty, setIsEditorEmpty] = useState(true);
   const editor = useEditor({
     extensions: [StarterKit, Image, Video, ParagraphFormat, EditorFont, EditorFontSize],
     content: value || '<p></p>',
@@ -130,7 +133,11 @@ export function RichEditor({ value, onChange, placeholder }: {
     editorProps: {
       attributes: { class: 're-content prose' },
     },
-    onUpdate: ({ editor: e }) => onChange(e.getHTML()),
+    onCreate: ({ editor: e }) => setIsEditorEmpty(e.isEmpty),
+    onUpdate: ({ editor: e }) => {
+      setIsEditorEmpty(e.isEmpty);
+      onChange(e.getHTML());
+    },
   });
 
   const setParagraphAttr = (attr: 'textAlign' | 'lineHeight', value: string | null) => {
@@ -167,6 +174,7 @@ export function RichEditor({ value, onChange, placeholder }: {
   useEffect(() => {
     if (editor && value !== editor.getHTML() && !editor.isFocused) {
       editor.commands.setContent(value || '<p></p>', { emitUpdate: false });
+      setIsEditorEmpty(editor.isEmpty);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, editor]);
@@ -280,7 +288,7 @@ export function RichEditor({ value, onChange, placeholder }: {
       {/* 플레이스홀더는 본문 영역 기준으로 — 툴바가 두 줄이 돼도 안 밀림 (v1.9 사용자 발견) */}
       <div className="re-body">
         <EditorContent editor={editor} />
-        {placeholder && editor.isEmpty && <div className="re-ph">{placeholder}</div>}
+        {placeholder && isEditorEmpty && <div className="re-ph">{placeholder}</div>}
       </div>
     </div>
   );
