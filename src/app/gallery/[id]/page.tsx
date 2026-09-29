@@ -83,6 +83,7 @@ export default function BackupDetailPage() {
         <div className="head-actions">
           {canManage && <button className="btn btn-dark" onClick={() => router.push(`/gallery/${p.id}/edit`)}>EDIT</button>}
           {canManage && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
+          <button className="btn btn-dark" title="목록 보기" onClick={() => router.push(tt.href)}>LIST</button>
         </div>
       </div>
 

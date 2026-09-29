@@ -325,6 +325,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
         <p>{logNo(l)}{[l.writer, l.withText].filter(Boolean).map(x => ` · ${x}`).join('')}{l.date ? ` · ${l.date.replace(/-/g, '.')}` : ''}</p>
         <div className="head-actions">
           {rel && <button className="btn btn-dark" onClick={() => router.push(`/rels/${rel.id}`)}>{rel.name} ›</button>}
+          <button className="btn btn-dark" title="목록 보기" onClick={() => router.push(tt.href)}>LIST</button>
           {isAdmin && <button className="btn btn-dark" onClick={() => {
             setE({
               noText: l.noText ?? '', title: l.title, catchphrase: l.catchphrase ?? '', writer: l.writer,

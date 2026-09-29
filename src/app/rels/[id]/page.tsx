@@ -833,23 +833,22 @@ export default function RelDetailPage() {
         </div>
       )}
 
-      {/* 관리자 액션 (좌상단) */}
-      {isAdmin && (
-        <div className="rel-admin-actions">
-          {/* AU 선택 중이면 그 AU의 일러·캐치프레이즈를 편집 (v1.9) */}
+      {/* 상세 액션 (좌상단) — LIST는 모든 열람자, 편집/삭제는 관리자만 */}
+      <div className="rel-admin-actions">
+        {isAdmin && (<>
+          {/* AU 선택 중이면 그 AU의 일러·캐치프레이즈를 편집 */}
           <button className="btn btn-dark" style={{ height: 30, padding: '0 13px', fontSize: 11 }}
             onClick={() => router.push(`/rels/${rel.id}/edit${isBaseAu ? '' : `?au=${au!.id}`}`)}>
             {isBaseAu ? 'EDIT' : `EDIT ${au!.label}`}
           </button>
-          {/* AU를 보는 중이면 지워지는 것도 그 AU다 (v2.0 사용자 발견 — 자관이 통째로 지워졌다).
-              EDIT은 AU를 따라가는데 DELETE만 안 따라가서, AU 화면에서 누르면 자관 전체가 날아갔다.
-              버튼 글씨에도 무엇이 지워지는지 그대로 쓴다 */}
           <button className="btn btn-dark" style={{ height: 30, padding: '0 13px', fontSize: 11 }}
             onClick={() => (isBaseAu ? setDelAsk(true) : setAuDelAsk(au!.id))}>
             {isBaseAu ? 'DELETE' : `DELETE ${au!.label}`}
           </button>
-        </div>
-      )}
+        </>)}
+        <button className="btn btn-dark" title="목록 보기" style={{ height: 30, padding: '0 13px', fontSize: 11 }}
+          onClick={() => router.push('/rels')}>LIST</button>
+      </div>
 
       {/* AU 하나만 삭제 (v2.0 사용자 발견) — 자관 삭제와 확실히 구분되게 무엇이 남는지까지 적는다 */}
       <ConfirmModal open={auDelAsk !== null}

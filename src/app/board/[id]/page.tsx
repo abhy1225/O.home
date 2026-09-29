@@ -161,6 +161,7 @@ export default function BoardDetailPage() {
           {canManage && (
             <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>
           )}
+          <button className="btn btn-dark" title="목록 보기" onClick={() => router.push(boardHref(board.id))}>LIST</button>
         </div>
       </div>
 

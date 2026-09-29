@@ -144,6 +144,7 @@ function CharDetailInner() {
             <button className="btn btn-dark" onClick={() => router.push(editHref)}>EDIT</button>
           )}
           {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
+          <button className="btn btn-dark" title="목록 보기" onClick={() => router.push(tt.href)}>LIST</button>
         </div>
 
         <ConfirmModal open={delAsk} title="캐릭터를 삭제하시겠습니까?"

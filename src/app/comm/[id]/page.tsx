@@ -124,6 +124,7 @@ export default function CommDetailPage() {
         <div className="head-actions">
           {isAdmin && <button className="btn btn-dark" onClick={() => router.push(`/comm/${c.id}/edit`)}>EDIT</button>}
           {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
+          <button className="btn btn-dark" title="목록 보기" onClick={() => router.push('/comm')}>LIST</button>
         </div>
       </div>
 

@@ -64,6 +64,7 @@ export default function ApplicantDetailPage() {
         <div className="head-actions">
           {isAdmin && <button className="btn btn-dark" onClick={() => router.push(`/comm-apply/${a.id}/edit`)}>EDIT</button>}
           {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
+          <button className="btn btn-dark" title="목록 보기" onClick={() => router.push('/comm-apply')}>LIST</button>
         </div>
       </div>
 
