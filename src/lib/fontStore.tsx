@@ -318,7 +318,9 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     if (fileRef && /^https?:/.test(fileRef) && !shared && isServerMode()) {
       try {
         const be = backend();
-        void be.deleteFile(fileRef).catch(() => { /* 설정 삭제는 성공으로 유지 — 수동 정리 가능 */ });
+        if (be) {
+          void be.deleteFile(fileRef).catch(() => { /* 설정 삭제는 성공으로 유지 — 수동 정리 가능 */ });
+        }
       } catch { /* 백엔드 초기화 실패 시 원본은 보존 */ }
     }
   }, [st]);
