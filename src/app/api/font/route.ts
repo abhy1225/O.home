@@ -20,13 +20,16 @@ export async function GET(req: Request) {
     return new Response('host not allowed', { status: 400 });
   }
   try {
-    const res = await fetch(target, { cache: 'no-store' });
+    const res = await fetch(target, { cache: 'force-cache' });
     if (!res.ok || !res.body) return new Response('fetch failed', { status: 502 });
     return new Response(res.body, {
       headers: {
         'content-type': res.headers.get('content-type') ?? 'application/octet-stream',
         // 파일 주소에 고유 id가 들어 있어 내용이 변할 일이 없다 — 오래 캐시
         'cache-control': 'public, max-age=31536000, immutable',
+        // Vercel CDN에도 같은 폰트 응답을 오래 보관해 Compute 재중계를 줄인다.
+        'cdn-cache-control': 'public, max-age=31536000, immutable',
+        'vercel-cdn-cache-control': 'public, max-age=31536000, immutable',
       },
     });
   } catch {

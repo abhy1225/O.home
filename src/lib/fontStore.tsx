@@ -8,6 +8,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { newId } from './postStore';
 import { putBlob, getBlob } from './blobStore';
 import { getRawSetting, setSetting } from './settingStore';
+import { backend, isServerMode } from './backend';
 
 export interface FontDef {
   id: string;
@@ -283,6 +284,13 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeFont = useCallback((id: string) => {
+    // 업로드 폰트의 원본 Storage 파일도 함께 정리한다.
+    // 먼저 현재 상태에서 삭제 대상과 같은 fileId를 다른 폰트가 쓰는지 확인한다.
+    // UI/설정 삭제는 즉시 처리하고, Storage 삭제 실패가 폰트 삭제 자체를 막지는 않게 한다.
+    const target = st.custom.find(f => f.id === id);
+    const fileRef = target?.fileId;
+    const shared = !!fileRef && st.custom.some(f => f.id !== id && f.fileId === fileRef);
+
     apply(s => {
       const builtin = BUILTIN_FONTS.some(f => f.id === id);
       const base = builtin
@@ -304,7 +312,16 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
       ) as Record<FontRole, RoleSetting>;
       return { ...base, custom, overrides, roles };
     });
-  }, []);
+
+    // putBlob()이 서버 모드에서 만든 http(s) 참조만 실제 백엔드 Storage에서 삭제한다.
+    // 같은 파일을 다른 폰트가 공유하면 원본은 보존한다. 외부 URL/CSS 폰트도 건드리지 않는다.
+    if (fileRef && /^https?:/.test(fileRef) && !shared && isServerMode()) {
+      try {
+        const be = backend();
+        void be.deleteFile(fileRef).catch(() => { /* 설정 삭제는 성공으로 유지 — 수동 정리 가능 */ });
+      } catch { /* 백엔드 초기화 실패 시 원본은 보존 */ }
+    }
+  }, [st]);
 
   /** 내장 폰트를 처음 상태로 (v2.0 사용자 발견) — 수정값(overrides)을 지운다.
    *  잘못 들어간 값(엉뚱한 family·없는 페어)을 되돌릴 방법이 UI에 아예 없었다. */
