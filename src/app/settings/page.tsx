@@ -3374,7 +3374,7 @@ function FontPane() {
 
       {/* 폰트 파일 업로드 — woff2·woff·ttf·otf + 여러 파일 동시 등록 + 영문 폰트의 한글 페어링 */}
       <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
-        <label className="k-label" style={{ margin: 0 }}>폰트 파일 업로드 — woff2·woff·ttf·otf</label>
+        <label className="k-label" style={{ margin: 0 }}>폰트 파일 업로드 — woff2 권장 · woff·ttf·otf 지원</label>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span className="cp-lb">한글 페어</span>
           <KSelect minWidth={160} value={upPair} onChange={setUpPair}
@@ -3386,7 +3386,7 @@ function FontPane() {
               onChange={e => { if (e.target.files) uploadFontFiles(e.target.files); e.target.value = ''; }} />
           </label>
         </div>
-        <p className="hint">여러 폰트를 한 번에 선택하거나 드래그해서 등록할 수 있습니다. 표시 이름은 파일명 그대로 등록 — 목록의 [EDIT]에서 수정. 한글 미지원 폰트라면 한글 페어를 지정 — 한글 글자는 페어 폰트로 표시됩니다.</p>
+        <p className="hint">여러 폰트를 한 번에 선택하거나 드래그해서 등록할 수 있습니다. 웹 전송량을 줄이려면 WOFF2 형식을 권장합니다. TTF/OTF는 자동 압축되지 않고 원본 용량 그대로 저장됩니다. 표시 이름은 파일명 그대로 등록 — 목록의 [EDIT]에서 수정. 한글 미지원 폰트라면 한글 페어를 지정 — 한글 글자는 페어 폰트로 표시됩니다.</p>
       </div>
     </div>
   );

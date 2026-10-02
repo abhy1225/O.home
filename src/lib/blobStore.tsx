@@ -21,7 +21,12 @@ function extOf(blob: Blob): string {
   if (t.includes('mp4')) return 'mp4';
   if (t.includes('webm')) return 'webm';
   if (t.includes('quicktime')) return 'mov';
-  if (t.includes('font') || t.includes('woff')) return 'woff2';
+  // 폰트는 실제 MIME 형식을 보존한다. 확장자만 .woff2로 바꾸는 것은 변환이 아니다.
+  if (t.includes('woff2')) return 'woff2';
+  if (t.includes('woff')) return 'woff';
+  if (t.includes('truetype') || t.includes('ttf')) return 'ttf';
+  if (t.includes('opentype') || t.includes('otf')) return 'otf';
+  if (t.includes('font')) return 'ttf';
   if (t.startsWith('text/')) return 'txt';
   return 'bin';
 }
