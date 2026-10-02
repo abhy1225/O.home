@@ -171,24 +171,37 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st]);
 
-  // 업로드 폰트 파일 로드 (v1.9) — IndexedDB blob → FontFace 등록 (폰트당 1회)
-  const loadedFiles = useRef<Set<string>>(new Set());
+  // 업로드 폰트 파일 등록 (v2.1) — "등록"만 하고 즉시 다운로드하지 않는다.
+  //
+  // 이전 구현은 모든 업로드 폰트에 face.load()를 호출했다. 그 결과 현재 화면에서 쓰지 않는
+  // 폰트까지 /api/font 를 통해 한꺼번에 내려받아, 폰트가 많을수록 첫 접속의 Vercel Origin
+  // Transfer가 크게 늘었다. FontFaceSet에 unloaded 상태로 추가해 두면 브라우저가 실제로 그
+  // font-family가 렌더링에 필요해지는 순간에만 파일을 요청한다.
+  const registeredFiles = useRef<Set<string>>(new Set());
   useEffect(() => {
     pool.forEach(f => {
-      if (!f.fileId || loadedFiles.current.has(f.id)) return;
-      loadedFiles.current.add(f.id);
-      /* 서버 모드의 파일은 저장소 공개 URL — **폰트는 CORS 강제 자원**이라 저장소가 허용 헤더를
-         안 주면 직접 로드가 조용히 거부된다 (v2.0 사용자 제보 — 「등록한 폰트가 적용이 안 돼요」,
-         화면 전체가 폴백 세리프로 남던 원인). 같은 출처 중계(/api/font)로 받아 CORS를 피한다 */
+      if (!f.fileId || registeredFiles.current.has(f.id)) return;
+      registeredFiles.current.add(f.id);
+
+      /* 서버 모드의 파일은 저장소 공개 URL — 폰트는 CORS 강제 자원이라 저장소가 허용 헤더를
+         안 주면 직접 로드가 거부될 수 있다. 같은 출처 중계(/api/font)는 유지하되, 여기서는
+         load()를 호출하지 않는다. 실제 사용 시 브라우저가 필요할 때만 /api/font를 요청한다. */
       if (/^https?:/.test(f.fileId)) {
-        const face = new FontFace(f.family, `url("/api/font?u=${encodeURIComponent(f.fileId)}")`);
-        face.load().then(fc => document.fonts.add(fc)).catch(() => { /* 접근 불가 — 폴백 렌더 */ });
+        try {
+          const face = new FontFace(f.family, `url("/api/font?u=${encodeURIComponent(f.fileId)}")`);
+          document.fonts.add(face);
+        } catch { /* 잘못된 폰트 정의 — 폴백 렌더 */ }
         return;
       }
+
+      // 로컬 IndexedDB 파일은 네트워크/Vercel 전송량과 무관하다. Blob URL만 등록하고
+      // 실제 폰트 디코딩·로드는 CSS에서 해당 family가 쓰일 때 브라우저에 맡긴다.
       getBlob(f.fileId).then(b => {
         if (!b) return;
-        const face = new FontFace(f.family, `url(${URL.createObjectURL(b)})`);
-        face.load().then(fc => document.fonts.add(fc)).catch(() => { /* 손상 파일 — 폴백 렌더 */ });
+        try {
+          const face = new FontFace(f.family, `url(${URL.createObjectURL(b)})`);
+          document.fonts.add(face);
+        } catch { /* 손상 파일 — 폴백 렌더 */ }
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
