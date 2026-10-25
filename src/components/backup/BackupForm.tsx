@@ -135,7 +135,8 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
   };
 
   const addUrl = () => {
-    const src = mediaUrl.trim();
+    // Imgur의 BBCode 복사 형식 [img]URL[/img]도 그대로 붙여넣을 수 있게 한다.
+    const src = mediaUrl.trim().replace(/^\[img\]\s*/i, '').replace(/\s*\[\/img\]$/i, '').trim();
     if (!/^https?:\/\//i.test(src)) { toast('http:// 또는 https://로 시작하는 주소를 입력해 주세요'); return; }
     setFiles(f => [...f, { id: newId(), name: isVideoRef(src) ? '동영상 URL' : '이미지 URL', ref: src, original: true }]);
     setMediaUrl('');
@@ -211,7 +212,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
           </div>
           {urlOpen && (
             <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
-              <KInput value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} placeholder="이미지/GIF/MP4 직접 주소 (https://...)" style={{ flex: 1 }}
+              <KInput value={mediaUrl} onChange={e => setMediaUrl(e.target.value.trim().replace(/^\[img\]\s*/i, '').replace(/\s*\[\/img\]$/i, '').trim())} placeholder="이미지/GIF/MP4 직접 주소 (https://...)" style={{ flex: 1 }}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addUrl(); } }} />
               <button type="button" className="btn btn-dark" onClick={addUrl}>추가</button>
             </div>
